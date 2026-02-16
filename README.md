@@ -93,6 +93,18 @@ Main arguments:
 - `--level`: Aggregation level (`domain`, `field`, `subfield`, `topic`).
 - `--output-file`: Output CSV filename.
 
+#### Real computed metrics (CSV excerpt)
+
+Excerpt from a real run (`metrics_by_field.20260215.csv`):
+
+```csv
+category id,topic level,journal title,publication year,is scielo,journal publications count,journal citations total,journal impact normalized,top 50pct all time publications share pct
+Agricultural and Biological Sciences,field,International Journal of Fauna and Biological Studies,2020,0,57,82.0,0.12166568613765485,10.526315789473683
+Agricultural and Biological Sciences,field,Journal of Pharmacognosy and Phytochemistry,2020,0,1895,2855.0,0.1274165997400815,12.137203166226913
+Agricultural and Biological Sciences,field,Ecosistemas y recursos agropecuarios,2020,1,24,36.0,0.1268587337167011,4.166666666666666
+Agricultural and Biological Sciences,field,African Journal of Biomedical Research,2020,0,8,25.0,0.26428902857646064,50.0
+```
+
 ### How to run for all years and all levels
 
 To process all years, use the `--start-year` and `--end-year` arguments to define the desired range. To process all aggregation levels (`domain`, `field`, `subfield`, `topic`), run the command repeatedly, changing the `--level` value each time.
