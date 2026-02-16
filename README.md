@@ -32,6 +32,29 @@ pytest
 pip install .
 ```
 
+### Data Sources
+
+- **OpenAlex**: Data is obtained from the OpenAlex snapshot, specifically the SciELO subset. See: https://docs.openalex.org/download-all-data/openalex-snapshot
+- **SciELO**: Data is obtained from a MongoDB dump of the ArticleMeta database (internal SciELO infrastructure).
+
+### End-to-End Pipeline (4 stages)
+
+The overall workflow is organized into four stages:
+
+1. Extract OpenAlex works into Parquet (`oca-prep extract-oa`).
+2. Prepare and deduplicate SciELO records (`oca-prep prepare-scielo`).
+3. Integrate SciELO and OpenAlex into a merged dataset (`oca-prep integrate`).
+4. Compute category and journal indicators from the merged Parquet (`oca-metrics`).
+
+```mermaid
+flowchart LR
+    A["1. Extract OpenAlex<br/>oca-prep extract-oa"]
+    B["2. Prepare SciELO<br/>oca-prep prepare-scielo"]
+    C["3. Integrate datasets<br/>oca-prep integrate"]
+    D["4. Compute indicators<br/>oca-metrics"]
+    A --> B --> C --> D
+```
+
 ### Data Preparation (CLI)
 
 The library provides the `oca-prep` tool to prepare data before metric computation.
@@ -205,11 +228,35 @@ A single article published in multiple languages (e.g., three versions) is repre
 
 To address this, the merging process consolidates all language versions and their citations into a single article. This ensures that the total contribution of the article is accurately computed, reflecting all versions and citations without duplication.
 
+### Example merged record
+
+Illustrative example (`is_merged = true`):
+
+| work_id | all_work_ids | scielo_pid_v2 | publication_year | citations_total | citations_window_2y | citations_window_3y | citations_window_5y |
+|:--|:--|:--|--:|--:|--:|--:|--:|
+| https://openalex.org/W1 | [https://openalex.org/W1, https://openalex.org/W2] | [S0001] | 2021 | 15 | 3 | 5 | 8 |
+
+In this example, the final record consolidates two OpenAlex works (W1 and W2) linked to the same SciELO article.
+
 ---
 
 ## Category classification and metric mathematics
 
 Articles are classified into four hierarchical categories: **domain**, **field**, **subfield**, and **topic**. All bibliometric metrics are calculated and normalized within each category and publication year. This allows fair comparison between journals from different areas, as each journal is evaluated relative to its reference group.
+
+### Symbol legend
+
+- $c$: category (domain, field, subfield, or topic)
+- $y$: publication year
+- $j$: journal
+- $w$: citation window in years (e.g., 2, 3, 5)
+- $i$: publication index
+- $N$: publication count
+- $C$: citation count
+- $\bar{C}$: mean citations per publication
+- $Q_p$: percentile function at percentile $p$
+- $p$: percentile used for threshold calculation (99, 95, 90, 50)
+- $q$: top share in percent (1, 5, 10, 50), with $q=100-p$
 
 ### Normalization by category and year
 
@@ -217,10 +264,19 @@ For each category $c$ and year $y$, we calculate:
 
 - Total publications: $N_{c,y}$
 - Total citations: $C_{c,y}$
-- Mean citations per publication: $\bar{C}_{c,y} = \frac{C_{c,y}}{N_{c,y}}$
-- Total and mean citations in time windows $w$:
+- Mean citations per publication:
+
+$$
+\bar{C}_{c,y} = \frac{C_{c,y}}{N_{c,y}}
+$$
+
+- Citations in time window $w$:
   - $C_{c,y}^{(w)}$: total citations in window $w$
-  - $\bar{C}_{c,y}^{(w)} = \frac{C_{c,y}^{(w)}}{N_{c,y}}$
+- Mean citations in time window $w$:
+
+$$
+\bar{C}_{c,y}^{(w)} = \frac{C_{c,y}^{(w)}}{N_{c,y}}
+$$
 
 ### Journal metrics
 
@@ -228,10 +284,19 @@ For each journal $j$ in category $c$ and year $y$:
 
 - Total publications: $N_{j,c,y}$
 - Total citations: $C_{j,c,y}$
-- Mean citations per publication: $\bar{C}_{j,c,y} = \frac{C_{j,c,y}}{N_{j,c,y}}$
-- Citations in time windows $w$:
+- Mean citations per publication:
+
+$$
+\bar{C}_{j,c,y} = \frac{C_{j,c,y}}{N_{j,c,y}}
+$$
+
+- Citations in time window $w$:
   - $C_{j,c,y}^{(w)}$: total citations in window $w$
-  - $\bar{C}_{j,c,y}^{(w)} = \frac{C_{j,c,y}^{(w)}}{N_{j,c,y}}$
+- Mean citations in time window $w$:
+
+$$
+\bar{C}_{j,c,y}^{(w)} = \frac{C_{j,c,y}^{(w)}}{N_{j,c,y}}
+$$
 
 ### Normalized impact
 
@@ -318,9 +383,14 @@ print(unmatched.head())
 print(f"Total unmatched: {len(unmatched)}")
 ```
 
-This approach provides a transparent and detailed audit of coverage gaps, without the need to redirect or parse logs.
+Example of real output from `unmatched.head()` (integration fixture):
 
-## Data Sources
+| work_id      | publication_year | doi         | citations_total | domain | field | subfield | topic |
+|:-------------|-----------------:|:------------|----------------:|:-------|:------|:---------|:------|
+| scielo:S0002 |             2024 | 10.1001/999 |               0 |        |       |          |       |
 
-- **OpenAlex**: Data is obtained from the OpenAlex snapshot, specifically the SciELO subset. See: https://docs.openalex.org/download-all-data/openalex-snapshot
-- **SciELO**: Data is obtained from a MongoDB dump of the ArticleMeta database (internal SciELO infrastructure).
+## References
+
+- Bibliometric positioning and percentile-based indicators in this project were inspired by the Leiden Ranking indicator documentation (CWTS Leiden Ranking): https://traditional.leidenranking.com/information/indicators
+- The taxonomy mapping used for OpenAlex categories (domain, field, subfield, topic) was based on the OpenAlex topic-classification repository: https://github.com/ourresearch/openalex-topic-classification
+- Additional methodological details for the OpenAlex topic-classification system were consulted in the public methodology document: https://docs.google.com/document/d/1bDopkhuGieQ4F8gGNj7sEc8WSE8mvLZS/edit#heading=h.5w2tb5fcg77r
