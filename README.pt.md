@@ -93,6 +93,18 @@ Argumentos principais:
 - `--level`: Nível de agregação (`domain`, `field`, `subfield`, `topic`).
 - `--output-file`: Nome do arquivo CSV de saída.
 
+#### Exemplo real de métricas computadas (trecho CSV)
+
+Trecho de uma execução real (`metrics_by_field.20260215.csv`):
+
+```csv
+category id,topic level,journal title,publication year,is scielo,journal publications count,journal citations total,journal impact normalized,top 50pct all time publications share pct
+Agricultural and Biological Sciences,field,International Journal of Fauna and Biological Studies,2020,0,57,82.0,0.12166568613765485,10.526315789473683
+Agricultural and Biological Sciences,field,Journal of Pharmacognosy and Phytochemistry,2020,0,1895,2855.0,0.1274165997400815,12.137203166226913
+Agricultural and Biological Sciences,field,Ecosistemas y recursos agropecuarios,2020,1,24,36.0,0.1268587337167011,4.166666666666666
+Agricultural and Biological Sciences,field,African Journal of Biomedical Research,2020,0,8,25.0,0.26428902857646064,50.0
+```
+
 ### Como rodar para todos os anos e todos os níveis
 
 Para processar todos os anos, utilize os argumentos `--start-year` e `--end-year` para definir o intervalo desejado. Para processar todos os níveis de agregação (`domain`, `field`, `subfield`, `topic`), execute o comando repetidamente, mudando o valor de `--level` em cada execução.
