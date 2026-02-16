@@ -235,29 +235,61 @@ Para cada revista $j$ en la categoría $c$ y año $y$:
 
 ### Impacto normalizado
 
-El impacto normalizado de la revista es:
+El impacto normalizado de la revista se calcula con protección para denominador cero:
 
 $$
-I_{j,c,y} = \frac{\bar{C}_{j,c,y}}{\bar{C}_{c,y}}
+I_{j,c,y} =
+\begin{cases}
+0, & \text{si } \bar{C}_{c,y}=0 \\
+\frac{\bar{C}_{j,c,y}}{\bar{C}_{c,y}}, & \text{en otro caso}
+\end{cases}
 $$
 
 Y para ventanas de tiempo:
 
 $$
-I_{j,c,y}^{(w)} = \frac{\bar{C}_{j,c,y}^{(w)}}{\bar{C}_{c,y}^{(w)}}
+I_{j,c,y}^{(w)} =
+\begin{cases}
+0, & \text{si } \bar{C}_{c,y}^{(w)}=0 \\
+\frac{\bar{C}_{j,c,y}^{(w)}}{\bar{C}_{c,y}^{(w)}}, & \text{en otro caso}
+\end{cases}
 $$
 
 ### Percentiles y umbrales
 
-Para cada categoría, se calculan los umbrales de citas para los percentiles (top 1%, 5%, 10%, 50%). Por ejemplo, el umbral para el top 5% es el valor de citas que separa el 5% más citado del resto.
+Los umbrales se calculan para percentiles $p \in \{99,95,90,50\}$, que corresponden a top $q \in \{1,5,10,50\}$ donde $q=100-p$.
 
-El porcentaje de publicaciones de una revista en el top $p$% es:
+Para todas las citas en la categoría $c$ y año $y$:
 
 $$
-S_{j,c,y}^{(p)} = \frac{N_{j,c,y}^{(p)}}{N_{j,c,y}} \times 100
+T_{c,y}^{(q)} = \left\lfloor Q_p\left(\mathcal{C}_{c,y}\right) \right\rfloor + 1
 $$
 
-Donde $N_{j,c,y}^{(p)}$ es el número de publicaciones de la revista en el top $p$% de la categoría.
+Y para una ventana de citas $w$:
+
+$$
+T_{c,y}^{(q,w)} = \left\lfloor Q_p\left(\mathcal{C}_{c,y}^{(w)}\right) \right\rfloor + 1
+$$
+
+Los conteos de la revista en el top $q$% son:
+
+$$
+N_{j,c,y}^{(q)} = \sum_{i \in (j,c,y)} \mathbf{1}\!\left(C_{i,c,y} \ge T_{c,y}^{(q)}\right)
+$$
+
+$$
+N_{j,c,y}^{(q,w)} = \sum_{i \in (j,c,y)} \mathbf{1}\!\left(C_{i,c,y}^{(w)} \ge T_{c,y}^{(q,w)}\right)
+$$
+
+Y el porcentaje de publicaciones es:
+
+$$
+S_{j,c,y}^{(q)} = \frac{N_{j,c,y}^{(q)}}{N_{j,c,y}} \times 100
+$$
+
+$$
+S_{j,c,y}^{(q,w)} = \frac{N_{j,c,y}^{(q,w)}}{N_{j,c,y}} \times 100
+$$
 
 ### Ejemplo práctico
 
@@ -265,7 +297,7 @@ Si una revista tiene 20 artículos en una categoría en 2024, con 100 citas tota
 
 - $\bar{C}_{j,c,2024} = \frac{100}{20} = 5$ citas por artículo
 - Si el promedio de la categoría es 4, entonces $I_{j,c,2024} = \frac{5}{4} = 1.25$
-- Si 2 artículos están en el top 5% de la categoría, entonces $S_{j,c,2024}^{(5)} = \frac{2}{20} \times 100 = 10\%$
+- Si el umbral del top 5% es $T_{c,2024}^{(5)}=11$ y 2 artículos están por encima de ese umbral, entonces $S_{j,c,2024}^{(5)} = \frac{2}{20} \times 100 = 10\%$
 
 Estas fórmulas permiten entender y comparar el desempeño de las revistas en cada área, ajustando por diferencias de tamaño e impacto.
 

@@ -235,29 +235,61 @@ Para cada periódico $j$ na categoria $c$ e ano $y$:
 
 ### Impacto normalizado
 
-O impacto normalizado do periódico é dado por:
+O impacto normalizado do periódico é calculado com proteção para denominador zero:
 
 $$
-I_{j,c,y} = \frac{\bar{C}_{j,c,y}}{\bar{C}_{c,y}}
+I_{j,c,y} =
+\begin{cases}
+0, & \text{se } \bar{C}_{c,y}=0 \\
+\frac{\bar{C}_{j,c,y}}{\bar{C}_{c,y}}, & \text{caso contrário}
+\end{cases}
 $$
 
 E para janelas de tempo:
 
 $$
-I_{j,c,y}^{(w)} = \frac{\bar{C}_{j,c,y}^{(w)}}{\bar{C}_{c,y}^{(w)}}
+I_{j,c,y}^{(w)} =
+\begin{cases}
+0, & \text{se } \bar{C}_{c,y}^{(w)}=0 \\
+\frac{\bar{C}_{j,c,y}^{(w)}}{\bar{C}_{c,y}^{(w)}}, & \text{caso contrário}
+\end{cases}
 $$
 
 ### Percentis e thresholds
 
-Para cada categoria, calculamos os thresholds de citações para os percentis (top 1%, 5%, 10%, 50%). Por exemplo, o threshold para o top 5% é o valor de citações que separa os 5% mais citados dos demais.
+Os thresholds são calculados para percentis $p \in \{99,95,90,50\}$, que correspondem aos tops $q \in \{1,5,10,50\}$ onde $q=100-p$.
 
-O percentual de publicações de um periódico no top $p$% é:
+Para todas as citações na categoria $c$ e ano $y$:
 
 $$
-S_{j,c,y}^{(p)} = \frac{N_{j,c,y}^{(p)}}{N_{j,c,y}} \times 100
+T_{c,y}^{(q)} = \left\lfloor Q_p\left(\mathcal{C}_{c,y}\right) \right\rfloor + 1
 $$
 
-Onde $N_{j,c,y}^{(p)}$ é o número de publicações do periódico no top $p$% da categoria.
+E para uma janela de citações $w$:
+
+$$
+T_{c,y}^{(q,w)} = \left\lfloor Q_p\left(\mathcal{C}_{c,y}^{(w)}\right) \right\rfloor + 1
+$$
+
+As contagens do periódico no top $q$% são:
+
+$$
+N_{j,c,y}^{(q)} = \sum_{i \in (j,c,y)} \mathbf{1}\!\left(C_{i,c,y} \ge T_{c,y}^{(q)}\right)
+$$
+
+$$
+N_{j,c,y}^{(q,w)} = \sum_{i \in (j,c,y)} \mathbf{1}\!\left(C_{i,c,y}^{(w)} \ge T_{c,y}^{(q,w)}\right)
+$$
+
+E o percentual de publicações é:
+
+$$
+S_{j,c,y}^{(q)} = \frac{N_{j,c,y}^{(q)}}{N_{j,c,y}} \times 100
+$$
+
+$$
+S_{j,c,y}^{(q,w)} = \frac{N_{j,c,y}^{(q,w)}}{N_{j,c,y}} \times 100
+$$
 
 ### Exemplo prático
 
@@ -265,7 +297,7 @@ Se um periódico tem 20 artigos em uma categoria em 2024, com 100 citações tot
 
 - $\bar{C}_{j,c,2024} = \frac{100}{20} = 5$ citações por artigo
 - Se a média da categoria é 4, então $I_{j,c,2024} = \frac{5}{4} = 1.25$
-- Se 2 artigos estão no top 5% da categoria, então $S_{j,c,2024}^{(5)} = \frac{2}{20} \times 100 = 10\%$
+- Se o threshold do top 5% é $T_{c,2024}^{(5)}=11$ e 2 artigos estão acima desse threshold, então $S_{j,c,2024}^{(5)} = \frac{2}{20} \times 100 = 10\%$
 
 Essas fórmulas permitem entender e comparar o desempenho dos periódicos em cada área, ajustando para diferenças de tamanho e impacto.
 

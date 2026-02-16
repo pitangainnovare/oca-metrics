@@ -235,29 +235,61 @@ For each journal $j$ in category $c$ and year $y$:
 
 ### Normalized impact
 
-The normalized impact of the journal is:
+The normalized impact of the journal is computed with a zero-denominator guard:
 
 $$
-I_{j,c,y} = \frac{\bar{C}_{j,c,y}}{\bar{C}_{c,y}}
+I_{j,c,y} =
+\begin{cases}
+0, & \text{if } \bar{C}_{c,y}=0 \\
+\frac{\bar{C}_{j,c,y}}{\bar{C}_{c,y}}, & \text{otherwise}
+\end{cases}
 $$
 
 And for time windows:
 
 $$
-I_{j,c,y}^{(w)} = \frac{\bar{C}_{j,c,y}^{(w)}}{\bar{C}_{c,y}^{(w)}}
+I_{j,c,y}^{(w)} =
+\begin{cases}
+0, & \text{if } \bar{C}_{c,y}^{(w)}=0 \\
+\frac{\bar{C}_{j,c,y}^{(w)}}{\bar{C}_{c,y}^{(w)}}, & \text{otherwise}
+\end{cases}
 $$
 
 ### Percentiles and thresholds
 
-For each category, citation thresholds are calculated for percentiles (top 1%, 5%, 10%, 50%). For example, the threshold for the top 5% is the citation value that separates the top 5% most cited from the rest.
+Thresholds are computed for percentiles $p \in \{99,95,90,50\}$, which correspond to top shares $q \in \{1,5,10,50\}$ where $q=100-p$.
 
-The percentage of a journal's publications in the top $p$% is:
+For all citations in category $c$ and year $y$:
 
 $$
-S_{j,c,y}^{(p)} = \frac{N_{j,c,y}^{(p)}}{N_{j,c,y}} \times 100
+T_{c,y}^{(q)} = \left\lfloor Q_p\left(\mathcal{C}_{c,y}\right) \right\rfloor + 1
 $$
 
-Where $N_{j,c,y}^{(p)}$ is the number of journal publications in the top $p$% of the category.
+And for a citation window $w$:
+
+$$
+T_{c,y}^{(q,w)} = \left\lfloor Q_p\left(\mathcal{C}_{c,y}^{(w)}\right) \right\rfloor + 1
+$$
+
+Journal counts in top $q$% are:
+
+$$
+N_{j,c,y}^{(q)} = \sum_{i \in (j,c,y)} \mathbf{1}\!\left(C_{i,c,y} \ge T_{c,y}^{(q)}\right)
+$$
+
+$$
+N_{j,c,y}^{(q,w)} = \sum_{i \in (j,c,y)} \mathbf{1}\!\left(C_{i,c,y}^{(w)} \ge T_{c,y}^{(q,w)}\right)
+$$
+
+And publication share is:
+
+$$
+S_{j,c,y}^{(q)} = \frac{N_{j,c,y}^{(q)}}{N_{j,c,y}} \times 100
+$$
+
+$$
+S_{j,c,y}^{(q,w)} = \frac{N_{j,c,y}^{(q,w)}}{N_{j,c,y}} \times 100
+$$
 
 ### Practical example
 
@@ -265,7 +297,7 @@ If a journal has 20 articles in a category in 2024, with 100 total citations:
 
 - $\bar{C}_{j,c,2024} = \frac{100}{20} = 5$ citations per article
 - If the category mean is 4, then $I_{j,c,2024} = \frac{5}{4} = 1.25$
-- If 2 articles are in the top 5%, of the category, then $S_{j,c,2024}^{(5)} = \frac{2}{20} \times 100 = 10\%$
+- If the top 5% threshold is $T_{c,2024}^{(5)}=11$ and 2 articles are above this threshold, then $S_{j,c,2024}^{(5)} = \frac{2}{20} \times 100 = 10\%$
 
 These formulas allow understanding and comparing journal performance in each area, adjusting for differences in size and impact.
 
