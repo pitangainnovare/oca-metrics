@@ -93,17 +93,16 @@ Argumentos principales:
 - `--level`: Nivel de agregación (`domain`, `field`, `subfield`, `topic`).
 - `--output-file`: Nombre del archivo CSV de salida.
 
-#### Ejemplo real de métricas computadas (extracto CSV)
+#### Ejemplo real de métricas computadas (extracto en tabla)
 
-Extracto de una ejecución real (`metrics_by_field.20260215.csv`):
+Extracto de una ejecución real (`metrics_by_field.20260215.csv`, valores redondeados para facilitar la lectura y nombres de revistas anonimizados):
 
-```csv
-category id,topic level,journal title,publication year,is scielo,journal publications count,journal citations total,journal impact normalized,top 50pct all time publications share pct
-Agricultural and Biological Sciences,field,International Journal of Fauna and Biological Studies,2020,0,57,82.0,0.12166568613765485,10.526315789473683
-Agricultural and Biological Sciences,field,Journal of Pharmacognosy and Phytochemistry,2020,0,1895,2855.0,0.1274165997400815,12.137203166226913
-Agricultural and Biological Sciences,field,Ecosistemas y recursos agropecuarios,2020,1,24,36.0,0.1268587337167011,4.166666666666666
-Agricultural and Biological Sciences,field,African Journal of Biomedical Research,2020,0,8,25.0,0.26428902857646064,50.0
-```
+| Categoría | Nivel | Revista | Año | SciELO | Publicaciones de la revista | Citas totales de la revista | Impacto normalizado de la revista | Porcentaje de publicaciones en el top 50% |
+|:--|:--|:--|--:|--:|--:|--:|--:|--:|
+| Agricultural and Biological Sciences | field | Journal A | 2020 | 0 | 57 | 82.0 | 0.1217 | 10.53 |
+| Agricultural and Biological Sciences | field | Journal B | 2020 | 0 | 1895 | 2855.0 | 0.1274 | 12.14 |
+| Agricultural and Biological Sciences | field | Journal C | 2020 | 1 | 24 | 36.0 | 0.1269 | 4.17 |
+| Agricultural and Biological Sciences | field | Journal D | 2020 | 0 | 8 | 25.0 | 0.2643 | 50.00 |
 
 ### Cómo ejecutar para todos los años y todos los niveles
 
