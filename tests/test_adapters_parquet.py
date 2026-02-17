@@ -79,22 +79,18 @@ class TestParquetAdapter(unittest.TestCase):
         self.assertEqual(baseline['total_citations'], 7)
 
     def test_compute_thresholds(self):
-        # Percentiles: 99, 50
+        # Percentiles: 50
         thresholds = self.adapter.compute_thresholds(2024, 'field', 'Medicine', [2], [50])
-        # Citations total: 5, 10, 20. Median (50%) is 10.
-        # Quantile continuous 0.5 of [5, 10, 20] is 10.
-        # Threshold logic: CAST(quantile_cont(...) AS INT) + 1
-        # So 10 + 1 = 11
-        self.assertEqual(thresholds['C_top50pct'], 11)
+        # Citations total: 5, 10, 20. Median (50%) with discrete quantile is 10.
+        self.assertEqual(thresholds['C_top50pct'], 10)
         
         # Window 2y: 1, 2, 4. Median is 2.
-        # Threshold: 2 + 1 = 3
-        self.assertEqual(thresholds['C_top50pct_window_2y'], 3)
+        self.assertEqual(thresholds['C_top50pct_window_2y'], 2)
 
     def test_compute_journal_metrics(self):
         thresholds = {
-            'C_top50pct': 11,
-            'C_top50pct_window_2y': 3
+            'C_top50pct': 10,
+            'C_top50pct_window_2y': 2
         }
         df_journals = self.adapter.compute_journal_metrics(2024, 'field', 'Medicine', [2], thresholds)
         
@@ -107,11 +103,11 @@ class TestParquetAdapter(unittest.TestCase):
         self.assertEqual(s1['journal_citations_total'], 30) # 10 + 20
         
         # Check top counts
-        # S1 citations: 10, 20. Threshold 11. Only 20 >= 11. Count = 1.
-        self.assertEqual(s1['top_50pct_all_time_publications_count'], 1)
+        # S1 citations: 10, 20. Threshold 10. Both >= 10. Count = 2.
+        self.assertEqual(s1['top_50pct_all_time_publications_count'], 2)
         
-        # S1 window 2y: 2, 4. Threshold 3. Only 4 >= 3. Count = 1.
-        self.assertEqual(s1['top_50pct_window_2y_publications_count'], 1)
+        # S1 window 2y: 2, 4. Threshold 2. Both >= 2. Count = 2.
+        self.assertEqual(s1['top_50pct_window_2y_publications_count'], 2)
         self.assertEqual(s1['is_journal_multilingual'], 1)
         self.assertEqual(s1['citations_2024'], 4)  # 1 + 3
         self.assertEqual(s1['citations_2025'], 7)  # 2 + 5
