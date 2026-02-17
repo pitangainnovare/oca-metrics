@@ -6,9 +6,11 @@ import pandas as pd
 
 from oca_metrics.adapters.parquet import ParquetAdapter
 from oca_metrics.core import MetricsEngine
-from oca_metrics.utils.metrics import (
-    load_global_metadata,
+from oca_metrics.utils.csv_schema import (
     get_csv_schema_order,
+)
+from oca_metrics.utils.metadata import (
+    load_global_metadata,
 )
 from oca_metrics.utils.normalization import (
     format_output_header_name,

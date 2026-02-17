@@ -1,12 +1,15 @@
 from typing import Any, Dict, List, Optional, Sequence
 
 import duckdb
-import json
 import logging
 import pandas as pd
-import re
 
 from oca_metrics.adapters.base import BaseAdapter
+from oca_metrics.utils.parquet import (
+    extract_yearly_citation_columns,
+    get_valid_level_column,
+    is_multilingual_scielo_merge_record,
+)
 
 
 logger = logging.getLogger(__name__)
@@ -22,7 +25,7 @@ class ParquetAdapter(BaseAdapter):
         try:
             self.con.execute(f"CREATE VIEW {self.table_name} AS SELECT * FROM read_parquet('{parquet_path}', union_by_name=True)")
             self.table_columns = self._get_table_columns()
-            self.yearly_citation_cols = self._extract_yearly_citation_columns(self.table_columns)
+            self.yearly_citation_cols = extract_yearly_citation_columns(self.table_columns)
         except Exception as e:
             logger.error(f"Failed to load parquet file at {parquet_path}: {e}")
             raise
@@ -30,55 +33,12 @@ class ParquetAdapter(BaseAdapter):
     def _get_table_columns(self) -> List[str]:
         return [row[0] for row in self.con.execute(f"DESCRIBE {self.table_name}").fetchall()]
 
-    @staticmethod
-    def _extract_yearly_citation_columns(columns: Sequence[str]) -> List[str]:
-        yearly_cols = [c for c in columns if re.match(r"^citations_\d{4}$", c)]
-        return sorted(yearly_cols, key=lambda c: int(c.split("_")[1]))
-
-    def _get_valid_level_column(self, level: str) -> str:
-        if not re.match(r"^[A-Za-z_][A-Za-z0-9_]*$", level):
-            raise ValueError(f"Invalid level column name: {level}")
-
-        if level not in self.table_columns:
-            raise ValueError(f"Level column not found in parquet schema: {level}")
-
-        return level
-
     def get_yearly_citation_columns(self) -> List[str]:
         try:
             return list(self.yearly_citation_cols)
         except Exception as e:
             logger.warning(f"Could not infer yearly citation columns: {e}")
             return []
-
-    @staticmethod
-    def _parse_merged_languages(payload: Any) -> set:
-        if payload is None or (isinstance(payload, float) and pd.isna(payload)):
-            return set()
-
-        try:
-            data = payload if isinstance(payload, dict) else json.loads(payload)
-        except Exception:
-            return set()
-
-        if not isinstance(data, dict):
-            return set()
-
-        langs = set()
-        for v in data.values():
-            if isinstance(v, dict):
-                lang = v.get("language")
-                if lang:
-                    langs.add(str(lang).strip().lower())
-
-        return langs
-
-    @classmethod
-    def _is_multilingual_scielo_merge_record(cls, is_merged: Any, payload: Any) -> int:
-        if not bool(is_merged):
-            return 0
-
-        return 1 if len(cls._parse_merged_languages(payload)) > 1 else 0
 
     @staticmethod
     def _build_top_counts_sql(windows: Sequence[int], thresholds: Dict[str, Any]) -> List[str]:
@@ -127,7 +87,7 @@ class ParquetAdapter(BaseAdapter):
         if not required_cols.issubset(set(self.table_columns)):
             return pd.DataFrame(columns=["journal_id", "is_journal_multilingual"])
 
-        level_col = self._get_valid_level_column(level)
+        level_col = get_valid_level_column(level, self.table_columns)
 
         query = f"""
         SELECT
@@ -146,7 +106,7 @@ class ParquetAdapter(BaseAdapter):
             return pd.DataFrame(columns=["journal_id", "is_journal_multilingual"])
 
         df["is_journal_multilingual"] = [
-            self._is_multilingual_scielo_merge_record(is_merged, payload)
+            is_multilingual_scielo_merge_record(is_merged, payload)
             for is_merged, payload in zip(df["is_merged"], df["oa_individual_works"])
         ]
         return (
@@ -156,7 +116,7 @@ class ParquetAdapter(BaseAdapter):
         )
 
     def get_categories(self, year: int, level: str, category_id: Optional[str] = None) -> List[str]:
-        level_col = self._get_valid_level_column(level)
+        level_col = get_valid_level_column(level, self.table_columns)
         query = f"SELECT DISTINCT {level_col} FROM {self.table_name} WHERE publication_year = ? AND {level_col} IS NOT NULL"
         params: List[Any] = [year]
 
@@ -172,7 +132,7 @@ class ParquetAdapter(BaseAdapter):
             return []
 
     def compute_baseline(self, year: int, level: str, cat_id: str, windows: Sequence[int]) -> Optional[pd.Series]:
-        level_col = self._get_valid_level_column(level)
+        level_col = get_valid_level_column(level, self.table_columns)
         query = f"""
         SELECT 
             COUNT(*) as total_docs,
@@ -195,7 +155,7 @@ class ParquetAdapter(BaseAdapter):
             return None
 
     def compute_thresholds(self, year: int, level: str, cat_id: str, windows: Sequence[int], target_percentiles: Sequence[int]) -> Dict[str, Any]:
-        level_col = self._get_valid_level_column(level)
+        level_col = get_valid_level_column(level, self.table_columns)
         threshold_cols = []
         for p in target_percentiles:
             threshold_cols.append(f"CAST(quantile_cont(citations_total, {p/100.0}) AS INT) + 1 as C_top{100-p}pct")
@@ -212,7 +172,7 @@ class ParquetAdapter(BaseAdapter):
             return {}
 
     def compute_journal_metrics(self, year: int, level: str, cat_id: str, windows: Sequence[int], thresholds: Dict[str, Any]) -> pd.DataFrame:
-        level_col = self._get_valid_level_column(level)
+        level_col = get_valid_level_column(level, self.table_columns)
         top_counts_sql = self._build_top_counts_sql(windows, thresholds)
         select_cols = self._build_journal_select_columns(windows, top_counts_sql)
 

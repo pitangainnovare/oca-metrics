@@ -3,11 +3,15 @@ import pandas as pd
 import os
 
 from oca_metrics.utils.constants import XLSX_TO_INTERNAL_COLUMN_MAP
+from oca_metrics.utils.csv_schema import (
+    get_csv_schema_order,
+)
+from oca_metrics.utils.metadata import (
+    load_global_metadata,
+)
 from oca_metrics.utils.metrics import (
     compute_normalized_impact,
     compute_percentiles,
-    get_csv_schema_order,
-    load_global_metadata,
 )
 from oca_metrics.utils.normalization import (
     format_output_header_name,
