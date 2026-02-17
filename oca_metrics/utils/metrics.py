@@ -24,6 +24,57 @@ from oca_metrics.utils.normalization import (
 
 
 logger = logging.getLogger(__name__)
+
+
+def _resolve_metadata_duplicates(df: pd.DataFrame, key_cols: Sequence[str], value_cols: Sequence[str]) -> pd.DataFrame:
+    dup_mask = df.duplicated(subset=list(key_cols), keep=False)
+    if not dup_mask.any():
+        return df
+
+    df_unique = df.loc[~dup_mask].copy()
+    df_dups = df.loc[dup_mask].copy()
+
+    resolved_rows = []
+    conflicting_groups = []
+
+    for key_values, group in df_dups.groupby(list(key_cols), sort=False):
+        stable = group[value_cols].nunique(dropna=False).max() <= 1
+        if stable:
+            resolved_rows.append(group.iloc[0].to_dict())
+        else:
+            conflicting_groups.append((*key_values, len(group)))
+
+    if resolved_rows:
+        df_resolved = pd.DataFrame(resolved_rows)
+        df_out = pd.concat([df_unique, df_resolved], ignore_index=True)
+    else:
+        df_out = df_unique
+
+    duplicate_rows_total = len(df_dups)
+    duplicate_rows_extra = int(df.duplicated(subset=list(key_cols)).sum())
+    duplicate_pairs = df_dups.drop_duplicates(subset=list(key_cols)).shape[0]
+    conflicting_rows = sum(g[2] for g in conflicting_groups)
+    logger.warning(
+        "Found %s duplicated source_id + publication_year rows in metadata "
+        "(%s total duplicated rows across %s pairs): kept %s stable pairs and dropped %s conflicting pairs (%s rows).",
+        duplicate_rows_extra,
+        duplicate_rows_total,
+        duplicate_pairs,
+        len(resolved_rows),
+        len(conflicting_groups),
+        conflicting_rows,
+    )
+
+    if conflicting_groups:
+        sample = conflicting_groups[:5]
+        logger.warning(
+            "Sample conflicting source_id + publication_year pairs (source_id, year, rows): %s",
+            sample,
+        )
+
+    return df_out
+
+
 def load_global_metadata(path: str) -> pd.DataFrame:
     if not os.path.exists(path):
         logger.warning(f"Global metadata file not found at {path}")
@@ -52,15 +103,12 @@ def load_global_metadata(path: str) -> pd.DataFrame:
         df = df[df["publication_year"].notna()].copy()
         df["publication_year"] = df["publication_year"].astype(int)
 
-        dup_count = int(df.duplicated(subset=["source_id", "publication_year"]).sum())
-        if dup_count > 0:
-            logger.warning(
-                f"Found {dup_count} duplicated source_id + publication_year rows in metadata. "
-                "Keeping the first occurrence."
-            )
-            df = df.drop_duplicates(subset=["source_id", "publication_year"], keep="first")
-
         ordered_cols = ["source_id", "publication_year"] + METADATA_TEXT_COLUMNS + METADATA_FLAG_COLUMNS
+        df = _resolve_metadata_duplicates(
+            df[ordered_cols].copy(),
+            key_cols=["source_id", "publication_year"],
+            value_cols=METADATA_TEXT_COLUMNS + METADATA_FLAG_COLUMNS,
+        )
         return df[ordered_cols]
 
     except Exception as e:

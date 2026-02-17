@@ -35,6 +35,15 @@ class ParquetAdapter(BaseAdapter):
         yearly_cols = [c for c in columns if re.match(r"^citations_\d{4}$", c)]
         return sorted(yearly_cols, key=lambda c: int(c.split("_")[1]))
 
+    def _get_valid_level_column(self, level: str) -> str:
+        if not re.match(r"^[A-Za-z_][A-Za-z0-9_]*$", level):
+            raise ValueError(f"Invalid level column name: {level}")
+
+        if level not in self.table_columns:
+            raise ValueError(f"Level column not found in parquet schema: {level}")
+
+        return level
+
     def get_yearly_citation_columns(self) -> List[str]:
         try:
             return list(self.yearly_citation_cols)
@@ -118,16 +127,18 @@ class ParquetAdapter(BaseAdapter):
         if not required_cols.issubset(set(self.table_columns)):
             return pd.DataFrame(columns=["journal_id", "is_journal_multilingual"])
 
+        level_col = self._get_valid_level_column(level)
+
         query = f"""
         SELECT
             source_id as journal_id,
             is_merged,
             oa_individual_works
         FROM {self.table_name}
-        WHERE publication_year = {year} AND {level} = '{cat_id}' AND source_id IS NOT NULL
+        WHERE publication_year = ? AND {level_col} = ? AND source_id IS NOT NULL
         """
         try:
-            df = self.con.execute(query).df()
+            df = self.con.execute(query, [year, cat_id]).df()
         except Exception:
             return pd.DataFrame(columns=["journal_id", "is_journal_multilingual"])
 
@@ -145,17 +156,23 @@ class ParquetAdapter(BaseAdapter):
         )
 
     def get_categories(self, year: int, level: str, category_id: Optional[str] = None) -> List[str]:
-        cat_filter = f"AND {level} = '{category_id}'" if category_id else ""
-        query = f"SELECT DISTINCT {level} FROM {self.table_name} WHERE publication_year = {year} AND {level} IS NOT NULL {cat_filter}"
+        level_col = self._get_valid_level_column(level)
+        query = f"SELECT DISTINCT {level_col} FROM {self.table_name} WHERE publication_year = ? AND {level_col} IS NOT NULL"
+        params: List[Any] = [year]
+
+        if category_id is not None:
+            query += f" AND {level_col} = ?"
+            params.append(category_id)
 
         try:
-            categories = self.con.execute(query).fetchall()
+            categories = self.con.execute(query, params).fetchall()
             return [c[0] for c in categories]
         except Exception as e:
             logger.error(f"Error fetching categories: {e}")
             return []
 
     def compute_baseline(self, year: int, level: str, cat_id: str, windows: Sequence[int]) -> Optional[pd.Series]:
+        level_col = self._get_valid_level_column(level)
         query = f"""
         SELECT 
             COUNT(*) as total_docs,
@@ -164,10 +181,10 @@ class ParquetAdapter(BaseAdapter):
             {", ".join([f"SUM(citations_window_{w}y) as total_citations_window_{w}y" for w in windows])},
             {", ".join([f"AVG(citations_window_{w}y) as mean_citations_window_{w}y" for w in windows])}
         FROM {self.table_name}
-        WHERE publication_year = {year} AND {level} = '{cat_id}'
+        WHERE publication_year = ? AND {level_col} = ?
         """
         try:
-            res = self.con.execute(query).df()
+            res = self.con.execute(query, [year, cat_id]).df()
             if res.empty or res.iloc[0]['total_docs'] == 0:
                 return None
 
@@ -178,6 +195,7 @@ class ParquetAdapter(BaseAdapter):
             return None
 
     def compute_thresholds(self, year: int, level: str, cat_id: str, windows: Sequence[int], target_percentiles: Sequence[int]) -> Dict[str, Any]:
+        level_col = self._get_valid_level_column(level)
         threshold_cols = []
         for p in target_percentiles:
             threshold_cols.append(f"CAST(quantile_cont(citations_total, {p/100.0}) AS INT) + 1 as C_top{100-p}pct")
@@ -185,15 +203,16 @@ class ParquetAdapter(BaseAdapter):
             for w in windows:
                 threshold_cols.append(f"CAST(quantile_cont(citations_window_{w}y, {p/100.0}) AS INT) + 1 as C_top{100-p}pct_window_{w}y")
         
-        query = f"SELECT {', '.join(threshold_cols)} FROM {self.table_name} WHERE publication_year = {year} AND {level} = '{cat_id}'"
+        query = f"SELECT {', '.join(threshold_cols)} FROM {self.table_name} WHERE publication_year = ? AND {level_col} = ?"
         try:
-            return self.con.execute(query).df().iloc[0].to_dict()
+            return self.con.execute(query, [year, cat_id]).df().iloc[0].to_dict()
 
         except Exception as e:
             logger.error(f"Error computing thresholds for {cat_id} in {year}: {e}")
             return {}
 
     def compute_journal_metrics(self, year: int, level: str, cat_id: str, windows: Sequence[int], thresholds: Dict[str, Any]) -> pd.DataFrame:
+        level_col = self._get_valid_level_column(level)
         top_counts_sql = self._build_top_counts_sql(windows, thresholds)
         select_cols = self._build_journal_select_columns(windows, top_counts_sql)
 
@@ -201,11 +220,11 @@ class ParquetAdapter(BaseAdapter):
         SELECT 
             {", ".join(select_cols)}
         FROM {self.table_name}
-        WHERE publication_year = {year} AND {level} = '{cat_id}' AND source_id IS NOT NULL
+        WHERE publication_year = ? AND {level_col} = ? AND source_id IS NOT NULL
         GROUP BY source_id
         """
         try:
-            df_journals = self.con.execute(query).df()
+            df_journals = self.con.execute(query, [year, cat_id]).df()
             if df_journals.empty:
                 return df_journals
 

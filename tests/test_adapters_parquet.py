@@ -15,11 +15,11 @@ class TestParquetAdapter(unittest.TestCase):
         
         # Create dummy data
         data = {
-            'publication_year': [2024, 2024, 2024, 2023],
-            'source_id': ['S1', 'S2', 'S1', 'S3'],
-            'source_issn_l': ['1234-5678', '8765-4321', '1234-5678', '1111-2222'],
-            'language': ['en', 'en', 'pt', 'en'],
-            'is_merged': [1, 0, 0, 0],
+            'publication_year': [2024, 2024, 2024, 2023, 2018],
+            'source_id': ['S1', 'S2', 'S1', 'S3', 'S4'],
+            'source_issn_l': ['1234-5678', '8765-4321', '1234-5678', '1111-2222', '9999-0000'],
+            'language': ['en', 'en', 'pt', 'en', 'en'],
+            'is_merged': [1, 0, 0, 0, 0],
             'oa_individual_works': [
                 json.dumps({
                     "W1": {"language": "en"},
@@ -29,14 +29,15 @@ class TestParquetAdapter(unittest.TestCase):
                 None,
                 None,
                 None,
+                None,
             ],
-            'field': ['Medicine', 'Medicine', 'Medicine', 'Physics'],
-            'citations_total': [10, 5, 20, 15],
-            'citations_window_2y': [2, 1, 4, 3],
-            'citations_window_3y': [3, 2, 5, 4],
-            'citations_window_5y': [5, 3, 8, 6],
-            'citations_2024': [1, 0, 3, 2],
-            'citations_2025': [2, 1, 5, 0],
+            'field': ['Medicine', 'Medicine', 'Medicine', 'Physics', "China's Socioeconomic Reforms and Governance"],
+            'citations_total': [10, 5, 20, 15, 7],
+            'citations_window_2y': [2, 1, 4, 3, 1],
+            'citations_window_3y': [3, 2, 5, 4, 2],
+            'citations_window_5y': [5, 3, 8, 6, 3],
+            'citations_2024': [1, 0, 3, 2, 0],
+            'citations_2025': [2, 1, 5, 0, 0],
         }
         df = pd.DataFrame(data)
         df.to_parquet(self.parquet_path)
@@ -53,6 +54,11 @@ class TestParquetAdapter(unittest.TestCase):
         self.assertIn('Medicine', categories)
         self.assertNotIn('Physics', categories) # Different year
 
+    def test_get_categories_with_apostrophe_filter(self):
+        cat = "China's Socioeconomic Reforms and Governance"
+        categories = self.adapter.get_categories(2018, 'field', cat)
+        self.assertEqual(categories, [cat])
+
     def test_get_yearly_citation_columns(self):
         citation_cols = self.adapter.get_yearly_citation_columns()
         self.assertEqual(citation_cols, ['citations_2024', 'citations_2025'])
@@ -64,6 +70,13 @@ class TestParquetAdapter(unittest.TestCase):
         self.assertEqual(baseline['total_citations'], 35) # 10 + 5 + 20
         self.assertAlmostEqual(baseline['mean_citations'], 35/3)
         self.assertEqual(baseline['total_citations_window_2y'], 7) # 2 + 1 + 4
+
+    def test_compute_baseline_with_apostrophe_category(self):
+        cat = "China's Socioeconomic Reforms and Governance"
+        baseline = self.adapter.compute_baseline(2018, 'field', cat, [2, 3, 5])
+        self.assertIsNotNone(baseline)
+        self.assertEqual(baseline['total_docs'], 1)
+        self.assertEqual(baseline['total_citations'], 7)
 
     def test_compute_thresholds(self):
         # Percentiles: 99, 50

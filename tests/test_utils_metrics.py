@@ -17,6 +17,10 @@ from oca_metrics.utils.normalization import (
 
 class TestUtilsMetrics(unittest.TestCase):
 
+    @staticmethod
+    def _metadata_template(rows: int = 2):
+        return {col: [""] * rows for col in XLSX_TO_INTERNAL_COLUMN_MAP.keys()}
+
     def test_shorten_openalex_id(self):
         self.assertEqual(shorten_openalex_id("https://openalex.org/S123"), "S123")
         self.assertEqual(shorten_openalex_id("S123"), "S123")
@@ -50,7 +54,7 @@ class TestUtilsMetrics(unittest.TestCase):
     def test_load_global_metadata(self):
         # Create a dummy excel file
         filename = "test_meta.xlsx"
-        data = {col: ["", ""] for col in XLSX_TO_INTERNAL_COLUMN_MAP.keys()}
+        data = self._metadata_template(2)
         data.update({
             'OpenAlex ID': ['S1', 'S2'],
             'Journal': ['J1', 'J2'],
@@ -85,6 +89,58 @@ class TestUtilsMetrics(unittest.TestCase):
             self.assertEqual(loaded_df.iloc[0]['publisher_name'], "Pub 1")
             self.assertEqual(loaded_df.iloc[0]['is_scopus'], 1)
             self.assertEqual(loaded_df.iloc[0]['capes_agricultural_sciences'], 1)
+        finally:
+            if os.path.exists(filename):
+                os.remove(filename)
+
+    def test_load_global_metadata_duplicate_identical_kept_once(self):
+        filename = "test_meta_dup_identical.xlsx"
+        data = self._metadata_template(2)
+        data.update({
+            'OpenAlex ID': ['S1', 'S1'],
+            'Journal': ['J1', 'J1'],
+            'Publisher Name': ['Pub 1', 'Pub 1'],
+            'Country': ['Brazil', 'Brazil'],
+            'SciELO collection acronym': ['scl', 'scl'],
+            'SciELO Thematic Areas': ['Health', 'Health'],
+            'CAPES agricultural sciences': [1, 1],
+            'is SciELO': [1, 1],
+            'is Scopus': [1, 1],
+            'YEAR': [2024, 2024],
+            'SciELO Active and Valid in the Year': [1, 1],
+        })
+        pd.DataFrame(data).to_excel(filename, index=False)
+
+        try:
+            loaded_df = load_global_metadata(filename)
+            self.assertEqual(len(loaded_df), 1)
+            self.assertEqual(loaded_df.iloc[0]['source_id'], "https://openalex.org/S1")
+            self.assertEqual(loaded_df.iloc[0]['publication_year'], 2024)
+        finally:
+            if os.path.exists(filename):
+                os.remove(filename)
+
+    def test_load_global_metadata_duplicate_conflicting_dropped(self):
+        filename = "test_meta_dup_conflict.xlsx"
+        data = self._metadata_template(2)
+        data.update({
+            'OpenAlex ID': ['S1', 'S1'],
+            'Journal': ['J1', 'J2'],
+            'Publisher Name': ['Pub 1', 'Pub 2'],
+            'Country': ['Brazil', 'Argentina'],
+            'SciELO collection acronym': ['scl', 'arg'],
+            'SciELO Thematic Areas': ['Health', 'Humanities'],
+            'CAPES agricultural sciences': [1, 0],
+            'is SciELO': [1, 0],
+            'is Scopus': [1, 0],
+            'YEAR': [2024, 2024],
+            'SciELO Active and Valid in the Year': [1, 0],
+        })
+        pd.DataFrame(data).to_excel(filename, index=False)
+
+        try:
+            loaded_df = load_global_metadata(filename)
+            self.assertTrue(loaded_df.empty)
         finally:
             if os.path.exists(filename):
                 os.remove(filename)
