@@ -157,13 +157,18 @@ class ParquetAdapter(BaseAdapter):
         threshold_cols = []
         for p in target_percentiles:
             pct_val = 100 - p
+            # top 1% -> p=99 -> quantile_disc(..., 0.99)
+            # top 5% -> p=95 -> quantile_disc(..., 0.95)
+            # ...
+            # top 50% -> p=50 -> quantile_disc(..., 0.50)
+            q = p / 100.0
             threshold_cols.append(
-                f"CAST(quantile_cont(citations_total, {p/100.0}) AS INT) + 1 as {build_threshold_key(pct_val)}"
+                f"quantile_disc(COALESCE(citations_total, 0), {q}) as {build_threshold_key(pct_val)}"
             )
 
             for w in windows:
                 threshold_cols.append(
-                    f"CAST(quantile_cont(citations_window_{w}y, {p/100.0}) AS INT) + 1 as {build_threshold_key(pct_val, w)}"
+                    f"quantile_disc(COALESCE(citations_window_{w}y, 0), {q}) as {build_threshold_key(pct_val, w)}"
                 )
         
         query = f"SELECT {', '.join(threshold_cols)} FROM {self.table_name} WHERE publication_year = ? AND {level_col} = ?"
