@@ -22,6 +22,9 @@ class ElasticsearchAdapter(BaseAdapter):
         self.index = index
         logger.warning("ElasticsearchAdapter is not fully implemented.")
 
+    def get_yearly_citation_columns(self) -> List[str]:
+        return []
+
     def get_categories(self, year: int, level: str, category_id: Optional[str] = None) -> List[str]:
         return []
 

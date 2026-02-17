@@ -1,4 +1,10 @@
+from typing import Any
+
 import unicodedata
+import numpy as np
+import pandas as pd
+
+from oca_metrics.utils.constants import OPENALEX_URL_PREFIX
 
 
 def stz_doi(value):
@@ -10,6 +16,7 @@ def stz_doi(value):
     doi = doi.replace("doi:", "").strip()
 
     return doi if doi else ""
+
 
 def stz_title(value):
     if not value:
@@ -26,6 +33,7 @@ def stz_title(value):
 
     return title if title else ""
 
+
 def extract_year(value):
     if not value:
         return None
@@ -37,3 +45,59 @@ def extract_year(value):
         pass
 
     return None
+
+
+def stz_text(value: Any) -> str:
+    if pd.isna(value):
+        return ""
+
+    return str(value).strip()
+
+
+def stz_binary_flag(value: Any) -> int:
+    if pd.isna(value):
+        return 0
+
+    if isinstance(value, bool):
+        return int(value)
+
+    if isinstance(value, (int, float, np.integer, np.floating)):
+        return int(value != 0)
+
+    txt = str(value).strip().lower()
+    if txt in {"1", "true", "t", "yes", "y", "sim", "s"}:
+        return 1
+
+    return 0
+
+
+def stz_openalex_source_id(value: Any, url_prefix: str = OPENALEX_URL_PREFIX) -> Any:
+    if pd.isna(value):
+        return None
+
+    v = str(value).strip()
+    if not v:
+        return None
+
+    if v.startswith(url_prefix):
+        return v
+
+    if v.startswith("S"):
+        return f"{url_prefix}{v}"
+
+    return v
+
+
+def format_output_header_name(internal_key: str) -> str:
+    return internal_key.replace("_", " ")
+
+
+def shorten_openalex_id(value: Any) -> Any:
+    if not isinstance(value, str):
+        return value
+
+    v = value.strip()
+    if v.startswith(OPENALEX_URL_PREFIX):
+        return v[len(OPENALEX_URL_PREFIX):]
+
+    return v

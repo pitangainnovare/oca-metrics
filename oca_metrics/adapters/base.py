@@ -17,6 +17,11 @@ class BaseAdapter(ABC):
     """Base interface for bibliometric data adapters."""
 
     @abstractmethod
+    def get_yearly_citation_columns(self) -> List[str]:
+        """Gets the available yearly citation columns (e.g., citations_2020)."""
+        pass
+
+    @abstractmethod
     def get_categories(self, year: int, level: str, category_id: Optional[str] = None) -> List[str]:
         """Gets the list of categories (cohorts) for a given year and level."""
         pass
