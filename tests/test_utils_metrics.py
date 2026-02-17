@@ -10,8 +10,11 @@ from oca_metrics.utils.metadata import (
     load_global_metadata,
 )
 from oca_metrics.utils.metrics import (
+    build_threshold_key,
+    compute_share_pct,
     compute_normalized_impact,
     compute_percentiles,
+    extract_threshold_pct_values,
 )
 from oca_metrics.utils.normalization import (
     format_output_header_name,
@@ -175,6 +178,25 @@ class TestUtilsMetrics(unittest.TestCase):
             compute_percentiles('notalist', [0.5])
         with self.assertRaises(ValueError):
             compute_percentiles([1, 2, 3], None)
+
+    def test_build_threshold_key(self):
+        self.assertEqual(build_threshold_key(50), "C_top50pct")
+        self.assertEqual(build_threshold_key(10, 3), "C_top10pct_window_3y")
+
+    def test_extract_threshold_pct_values(self):
+        thresholds = {
+            "C_top50pct": 11,
+            "C_top1pct": 101,
+            "C_top50pct_window_2y": 3,
+            "not_a_threshold": 0,
+        }
+        self.assertEqual(extract_threshold_pct_values(thresholds), [50, 1])
+
+    def test_compute_share_pct(self):
+        num = pd.Series([2, 1, 0, 4])
+        den = pd.Series([4, 0, None, 8])
+        res = compute_share_pct(num, den)
+        self.assertEqual(list(res), [50.0, 0.0, 0.0, 50.0])
 
 
 if __name__ == '__main__':

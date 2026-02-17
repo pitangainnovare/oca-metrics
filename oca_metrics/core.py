@@ -12,6 +12,8 @@ from oca_metrics.utils.constants import (
     METADATA_TEXT_COLUMNS,
 )
 from oca_metrics.utils.metrics import (
+    build_threshold_key,
+    compute_share_pct,
     compute_normalized_impact,
 )
 
@@ -64,12 +66,21 @@ class MetricsEngine:
         for p in self.target_percentiles:
             pct_val = 100 - p
 
-            df_journals[f'top_{pct_val}pct_all_time_citations_threshold'] = thresholds.get(f"C_top{pct_val}pct", 0)
-            df_journals[f'top_{pct_val}pct_all_time_publications_share_pct'] = (df_journals[f'top_{pct_val}pct_all_time_publications_count'] / df_journals['journal_publications_count']) * 100
+            df_journals[f'top_{pct_val}pct_all_time_citations_threshold'] = thresholds.get(build_threshold_key(pct_val), 0)
+            df_journals[f'top_{pct_val}pct_all_time_publications_share_pct'] = compute_share_pct(
+                df_journals[f'top_{pct_val}pct_all_time_publications_count'],
+                df_journals['journal_publications_count'],
+            )
 
             for w in windows:
-                df_journals[f'top_{pct_val}pct_window_{w}y_citations_threshold'] = thresholds.get(f"C_top{pct_val}pct_window_{w}y", 0)
-                df_journals[f'top_{pct_val}pct_window_{w}y_publications_share_pct'] = (df_journals[f'top_{pct_val}pct_window_{w}y_publications_count'] / df_journals['journal_publications_count']) * 100
+                df_journals[f'top_{pct_val}pct_window_{w}y_citations_threshold'] = thresholds.get(
+                    build_threshold_key(pct_val, w),
+                    0,
+                )
+                df_journals[f'top_{pct_val}pct_window_{w}y_publications_share_pct'] = compute_share_pct(
+                    df_journals[f'top_{pct_val}pct_window_{w}y_publications_count'],
+                    df_journals['journal_publications_count'],
+                )
 
         if df_meta is not None and not df_meta.empty:
             meta_cols = ['source_id', 'publication_year'] + METADATA_TEXT_COLUMNS + METADATA_FLAG_COLUMNS

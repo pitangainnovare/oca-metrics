@@ -5,6 +5,10 @@ import logging
 import pandas as pd
 
 from oca_metrics.adapters.base import BaseAdapter
+from oca_metrics.utils.metrics import (
+    build_threshold_key,
+    extract_threshold_pct_values,
+)
 from oca_metrics.utils.parquet import (
     extract_yearly_citation_columns,
     get_valid_level_column,
@@ -43,21 +47,15 @@ class ParquetAdapter(BaseAdapter):
     @staticmethod
     def _build_top_counts_sql(windows: Sequence[int], thresholds: Dict[str, Any]) -> List[str]:
         top_counts_sql = []
-        percentiles = set()
-        for key in thresholds.keys():
-            if key.startswith("C_top") and "pct" in key:
-                parts = key.split("top")[1].split("pct")
-                percentiles.add(int(parts[0]))
-
-        for pct_val in sorted(percentiles, reverse=True):
-            t_all = thresholds.get(f"C_top{pct_val}pct", 0)
+        for pct_val in extract_threshold_pct_values(thresholds):
+            t_all = thresholds.get(build_threshold_key(pct_val), 0)
             top_counts_sql.append(
                 f"SUM(CASE WHEN citations_total >= {t_all} THEN 1 ELSE 0 END) "
                 f"as top_{pct_val}pct_all_time_publications_count"
             )
 
             for w in windows:
-                t_w = thresholds.get(f"C_top{pct_val}pct_window_{w}y", 0)
+                t_w = thresholds.get(build_threshold_key(pct_val, w), 0)
                 top_counts_sql.append(
                     f"SUM(CASE WHEN citations_window_{w}y >= {t_w} THEN 1 ELSE 0 END) "
                     f"as top_{pct_val}pct_window_{w}y_publications_count"
@@ -158,10 +156,15 @@ class ParquetAdapter(BaseAdapter):
         level_col = get_valid_level_column(level, self.table_columns)
         threshold_cols = []
         for p in target_percentiles:
-            threshold_cols.append(f"CAST(quantile_cont(citations_total, {p/100.0}) AS INT) + 1 as C_top{100-p}pct")
+            pct_val = 100 - p
+            threshold_cols.append(
+                f"CAST(quantile_cont(citations_total, {p/100.0}) AS INT) + 1 as {build_threshold_key(pct_val)}"
+            )
 
             for w in windows:
-                threshold_cols.append(f"CAST(quantile_cont(citations_window_{w}y, {p/100.0}) AS INT) + 1 as C_top{100-p}pct_window_{w}y")
+                threshold_cols.append(
+                    f"CAST(quantile_cont(citations_window_{w}y, {p/100.0}) AS INT) + 1 as {build_threshold_key(pct_val, w)}"
+                )
         
         query = f"SELECT {', '.join(threshold_cols)} FROM {self.table_name} WHERE publication_year = ? AND {level_col} = ?"
         try:
