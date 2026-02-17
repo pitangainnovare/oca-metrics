@@ -7,7 +7,13 @@ import logging
 import pandas as pd
 
 from oca_metrics.adapters.base import BaseAdapter
-from oca_metrics.utils.metrics import compute_normalized_impact
+from oca_metrics.utils.constants import (
+    METADATA_FLAG_COLUMNS,
+    METADATA_TEXT_COLUMNS,
+)
+from oca_metrics.utils.metrics import (
+    compute_normalized_impact,
+)
 
 
 logger = logging.getLogger(__name__)
@@ -39,7 +45,7 @@ class MetricsEngine:
 
         # Add category and year information
         df_journals['category_id'] = cat_id
-        df_journals['topic_level'] = level
+        df_journals['category_level'] = level
         df_journals['publication_year'] = year
         df_journals['category_publications_count'] = baseline_res['total_docs']
         df_journals['category_citations_total'] = baseline_res['total_citations']
@@ -66,19 +72,57 @@ class MetricsEngine:
                 df_journals[f'top_{pct_val}pct_window_{w}y_publications_share_pct'] = (df_journals[f'top_{pct_val}pct_window_{w}y_publications_count'] / df_journals['journal_publications_count']) * 100
 
         if df_meta is not None and not df_meta.empty:
+            meta_cols = ['source_id', 'publication_year'] + METADATA_TEXT_COLUMNS + METADATA_FLAG_COLUMNS
+            available_meta_cols = [c for c in meta_cols if c in df_meta.columns]
+
+            if 'source_id' not in available_meta_cols or 'publication_year' not in available_meta_cols:
+                logger.warning(
+                    "Metadata is missing required matching columns source_id/publication_year. "
+                    "Skipping metadata merge for this batch."
+                )
+                available_meta_cols = []
+
+        else:
+            available_meta_cols = []
+
+        if available_meta_cols:
             df_journals = pd.merge(
                 df_journals, 
-                df_meta[['source_id', 'publication_year', 'journal_title', 'is_scielo']], 
+                df_meta[available_meta_cols], 
                 left_on=['journal_id', 'publication_year'], 
                 right_on=['source_id', 'publication_year'], 
                 how='left', 
                 suffixes=('', '_meta')
             )
-            df_journals['journal_title'] = df_journals['journal_title'].fillna(df_journals['journal_id'])
-            df_journals['is_scielo'] = df_journals['is_scielo'].fillna(0).astype(int)
 
-        else:
-            df_journals['journal_title'] = df_journals['journal_id']
-            df_journals['is_scielo'] = 0
+        def _series_or_default(col_name: str, default_value):
+            if col_name in df_journals.columns:
+                return df_journals[col_name]
+
+            return pd.Series(default_value, index=df_journals.index)
+
+        df_journals['journal_title'] = (
+            _series_or_default('journal_title', None)
+            .replace("", pd.NA)
+            .fillna(df_journals['journal_id'])
+        )
+
+        for col in METADATA_TEXT_COLUMNS:
+            if col == 'journal_title':
+                continue
+
+            df_journals[col] = _series_or_default(col, "").fillna("")
+
+        for col in METADATA_FLAG_COLUMNS:
+            df_journals[col] = pd.to_numeric(_series_or_default(col, 0), errors='coerce').fillna(0).astype(int)
+
+        has_scielo_collection = (
+            (df_journals['is_scielo'] == 1)
+            & (df_journals['scielo_active_valid'] == 1)
+        )
+        df_journals['collection'] = df_journals['scielo_collection_acronym'].where(has_scielo_collection, "")
+        df_journals['is_journal_multilingual'] = pd.to_numeric(
+            _series_or_default('is_journal_multilingual', 0), errors='coerce'
+        ).fillna(0).astype(int)
             
         return df_journals

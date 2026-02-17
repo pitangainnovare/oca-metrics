@@ -67,6 +67,7 @@ class TestMetricsEngine(unittest.TestCase):
         self.assertIsNotNone(df_result)
         self.assertEqual(len(df_result), 2)
         self.assertEqual(df_result.iloc[0]['category_id'], self.cat_id)
+        self.assertEqual(df_result.iloc[0]['category_level'], self.level)
         self.assertEqual(df_result.iloc[0]['publication_year'], self.year)
         
         # Check normalized impact
@@ -80,6 +81,8 @@ class TestMetricsEngine(unittest.TestCase):
         # Check metadata integration (default empty)
         self.assertEqual(df_result.iloc[0]['journal_title'], 'J1')
         self.assertEqual(df_result.iloc[0]['is_scielo'], 0)
+        self.assertEqual(df_result.iloc[0]['country'], '')
+        self.assertEqual(df_result.iloc[0]['collection'], '')
 
     def test_process_category_with_metadata(self):
         # Setup mocks similar to success case
@@ -125,7 +128,10 @@ class TestMetricsEngine(unittest.TestCase):
             'source_id': ['https://openalex.org/S1'],
             'publication_year': [2024],
             'journal_title': ['Journal One'],
-            'is_scielo': [1]
+            'is_scielo': [1],
+            'country': ['Brazil'],
+            'scielo_active_valid': [1],
+            'scielo_collection_acronym': ['scl'],
         })
 
         # Execute
@@ -136,10 +142,14 @@ class TestMetricsEngine(unittest.TestCase):
         row1 = df_result[df_result['journal_id'] == 'https://openalex.org/S1'].iloc[0]
         self.assertEqual(row1['journal_title'], 'Journal One')
         self.assertEqual(row1['is_scielo'], 1)
+        self.assertEqual(row1['country'], 'Brazil')
+        self.assertEqual(row1['collection'], 'scl')
         
         row2 = df_result[df_result['journal_id'] == 'https://openalex.org/S2'].iloc[0]
         self.assertEqual(row2['journal_title'], 'https://openalex.org/S2')
         self.assertEqual(row2['is_scielo'], 0)
+        self.assertEqual(row2['country'], '')
+        self.assertEqual(row2['collection'], '')
 
     def test_process_category_no_baseline(self):
         self.mock_adapter.compute_baseline.return_value = None

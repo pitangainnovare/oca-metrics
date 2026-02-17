@@ -2,13 +2,16 @@ import unittest
 import pandas as pd
 import os
 
+from oca_metrics.utils.constants import XLSX_TO_INTERNAL_COLUMN_MAP
 from oca_metrics.utils.metrics import (
     compute_normalized_impact,
     compute_percentiles,
-    format_output_header_name,
     get_csv_schema_order,
     load_global_metadata,
-    shorten_openalex_id
+)
+from oca_metrics.utils.normalization import (
+    format_output_header_name,
+    shorten_openalex_id,
 )
 
 
@@ -27,27 +30,41 @@ class TestUtilsMetrics(unittest.TestCase):
     def test_get_csv_schema_order(self):
         windows = [2, 3]
         percentiles = [99, 50]
-        schema = get_csv_schema_order(windows, percentiles)
+        schema = get_csv_schema_order(windows, percentiles, ["citations_2023", "citations_2024"])
         
-        expected_start = ["category_id", "topic_level", "journal_id"]
+        expected_start = ["category_id", "category_level", "journal_id"]
         for col in expected_start:
             self.assertIn(col, schema)
             
         self.assertIn("category_citations_mean_window_2y", schema)
         self.assertIn("top_1pct_all_time_citations_threshold", schema)
         self.assertIn("top_50pct_window_3y_publications_share_pct", schema)
+        self.assertIn("country", schema)
+        self.assertIn("collection", schema)
+        self.assertIn("is_scopus", schema)
+        self.assertIn("is_journal_multilingual", schema)
+        self.assertIn("citations_2023", schema)
+        self.assertIn("citations_2024", schema)
+        self.assertNotIn("scielo_collection_acronym", schema)
 
     def test_load_global_metadata(self):
         # Create a dummy excel file
         filename = "test_meta.xlsx"
-        df = pd.DataFrame({
+        data = {col: ["", ""] for col in XLSX_TO_INTERNAL_COLUMN_MAP.keys()}
+        data.update({
             'OpenAlex ID': ['S1', 'S2'],
             'Journal': ['J1', 'J2'],
-            'YEAR': [2024, 2024],
+            'Publisher Name': ['Pub 1', 'Pub 2'],
+            'Country': ['Brazil', 'Argentina'],
+            'SciELO collection acronym': ['scl', ''],
+            'SciELO Thematic Areas': ['Health', ''],
+            'CAPES agricultural sciences': [1, 0],
             'is SciELO': [1, 0],
+            'is Scopus': [1, 0],
+            'YEAR': [2024, 2024],
             'SciELO Active and Valid in the Year': [1, 0],
-            'SciELO network country': ['Brazil', '']
         })
+        df = pd.DataFrame(data)
         df.to_excel(filename, index=False)
         
         try:
@@ -55,8 +72,19 @@ class TestUtilsMetrics(unittest.TestCase):
             self.assertFalse(loaded_df.empty)
             self.assertIn('source_id', loaded_df.columns)
             self.assertIn('journal_title', loaded_df.columns)
+            self.assertIn('country', loaded_df.columns)
+            self.assertIn('scielo_collection_acronym', loaded_df.columns)
+            self.assertIn('scielo_active_valid', loaded_df.columns)
+            self.assertIn('publisher_name', loaded_df.columns)
+            self.assertIn('is_scopus', loaded_df.columns)
             self.assertEqual(loaded_df.iloc[0]['source_id'], "https://openalex.org/S1")
             self.assertEqual(loaded_df.iloc[0]['is_scielo'], 1)
+            self.assertEqual(loaded_df.iloc[0]['country'], "Brazil")
+            self.assertEqual(loaded_df.iloc[0]['scielo_collection_acronym'], "scl")
+            self.assertEqual(loaded_df.iloc[0]['scielo_active_valid'], 1)
+            self.assertEqual(loaded_df.iloc[0]['publisher_name'], "Pub 1")
+            self.assertEqual(loaded_df.iloc[0]['is_scopus'], 1)
+            self.assertEqual(loaded_df.iloc[0]['capes_agricultural_sciences'], 1)
         finally:
             if os.path.exists(filename):
                 os.remove(filename)

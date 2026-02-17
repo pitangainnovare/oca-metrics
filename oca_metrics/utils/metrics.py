@@ -1,5 +1,4 @@
 from typing import (
-    Any,
     Dict,
     List,
     Optional,
@@ -11,13 +10,20 @@ import numpy as np
 import os
 import pandas as pd
 
+from oca_metrics.utils.constants import (
+    CSV_METADATA_COLUMNS,
+    METADATA_FLAG_COLUMNS,
+    METADATA_TEXT_COLUMNS,
+    XLSX_TO_INTERNAL_COLUMN_MAP,
+)
+from oca_metrics.utils.normalization import (
+    stz_binary_flag,
+    stz_openalex_source_id,
+    stz_text,
+)
+
 
 logger = logging.getLogger(__name__)
-
-
-OPENALEX_URL_PREFIX = "https://openalex.org/"
-
-
 def load_global_metadata(path: str) -> pd.DataFrame:
     if not os.path.exists(path):
         logger.warning(f"Global metadata file not found at {path}")
@@ -25,38 +31,63 @@ def load_global_metadata(path: str) -> pd.DataFrame:
     
     logger.info(f"Loading global metadata from {path}...")
     try:
-        cols_xlsx = [
-            'OpenAlex ID',
-            'Journal',
-            'YEAR',
-            'is SciELO',
-            'SciELO Active and Valid in the Year',
-        ]
+        xlsx_cols = list(XLSX_TO_INTERNAL_COLUMN_MAP.keys())
+        df = pd.read_excel(path, usecols=xlsx_cols)
+        if df.empty:
+            return pd.DataFrame()
 
-        df = pd.read_excel(path, usecols=cols_xlsx)
+        df = df.rename(columns=XLSX_TO_INTERNAL_COLUMN_MAP)
+        df["source_id"] = df["openalex_id"].apply(stz_openalex_source_id)
+        df = df.drop(columns=["openalex_id"])
 
-        df['source_id'] = df['OpenAlex ID'].apply(
-            lambda x: f"{OPENALEX_URL_PREFIX}{x}" if pd.notna(x) and str(x).startswith('S') else x
-        )
+        df["publication_year"] = pd.to_numeric(df["publication_year"], errors="coerce")
 
-        df = df.rename(columns={
-            'Journal': 'journal_title',
-            'YEAR': 'publication_year',
-            'is SciELO': 'is_scielo'
-        })
-        return df
+        for col in METADATA_TEXT_COLUMNS:
+            df[col] = df[col].apply(stz_text)
+
+        for col in METADATA_FLAG_COLUMNS:
+            df[col] = df[col].apply(stz_binary_flag)
+
+        df = df[df["source_id"].notna()].copy()
+        df = df[df["publication_year"].notna()].copy()
+        df["publication_year"] = df["publication_year"].astype(int)
+
+        dup_count = int(df.duplicated(subset=["source_id", "publication_year"]).sum())
+        if dup_count > 0:
+            logger.warning(
+                f"Found {dup_count} duplicated source_id + publication_year rows in metadata. "
+                "Keeping the first occurrence."
+            )
+            df = df.drop_duplicates(subset=["source_id", "publication_year"], keep="first")
+
+        ordered_cols = ["source_id", "publication_year"] + METADATA_TEXT_COLUMNS + METADATA_FLAG_COLUMNS
+        return df[ordered_cols]
 
     except Exception as e:
         logger.error(f"Error loading global metadata: {e}")
         return pd.DataFrame()
 
 
-def get_csv_schema_order(windows: Sequence[int], target_percentiles: Optional[Sequence[int]] = None) -> List[str]:
+def get_csv_schema_order(
+    windows: Sequence[int],
+    target_percentiles: Optional[Sequence[int]] = None,
+    yearly_citation_cols: Optional[Sequence[str]] = None,
+) -> List[str]:
     if target_percentiles is None:
         target_percentiles = [99, 95, 90, 50]
+    if yearly_citation_cols is None:
+        yearly_citation_cols = []
         
     cols: List[str] = []
-    cols += ["category_id", "topic_level", "journal_id", "journal_issn", "journal_title", "publication_year"]
+    cols += [
+        "category_id",
+        "category_level",
+        "journal_id",
+        "journal_issn",
+        "journal_title",
+        *CSV_METADATA_COLUMNS,
+        "publication_year",
+    ]
     cols += ["category_citations_mean"]
     cols += [f"category_citations_mean_window_{w}y" for w in windows]
     cols += ["category_citations_total"]
@@ -64,11 +95,12 @@ def get_csv_schema_order(windows: Sequence[int], target_percentiles: Optional[Se
     cols += ["category_publications_count"]
     cols += [f"citations_window_{w}y" for w in windows]
     cols += [f"citations_window_{w}y_works" for w in windows]
-    cols += ["is_scielo", "journal_citations_mean"]
+    cols += list(yearly_citation_cols)
+    cols += ["journal_citations_mean"]
     cols += [f"journal_citations_mean_window_{w}y" for w in windows]
     cols += ["journal_citations_total", "journal_impact_normalized"]
     cols += [f"journal_impact_normalized_window_{w}y" for w in windows]
-    cols += ["journal_publications_count"]
+    cols += ["journal_publications_count", "is_journal_multilingual"]
     
     for p in target_percentiles:
         pct = 100 - p
@@ -79,21 +111,6 @@ def get_csv_schema_order(windows: Sequence[int], target_percentiles: Optional[Se
             cols += [f"top_{pct}pct_window_{w}y_citations_threshold", f"top_{pct}pct_window_{w}y_publications_count", f"top_{pct}pct_window_{w}y_publications_share_pct"]
 
     return cols
-
-
-def format_output_header_name(internal_key: str) -> str:
-    return internal_key.replace("_", " ")
-
-
-def shorten_openalex_id(value: Any) -> Any:
-    if not isinstance(value, str):
-        return value
-
-    v = value.strip()
-    if v.startswith(OPENALEX_URL_PREFIX):
-        return v[len(OPENALEX_URL_PREFIX):]
-
-    return v
 
 
 def compute_percentiles(citations: List[int], percentiles: List[float]) -> Dict[float, float]:

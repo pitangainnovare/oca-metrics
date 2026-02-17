@@ -1,8 +1,10 @@
 from typing import Any, Dict, List, Optional, Sequence
 
 import duckdb
+import json
 import logging
 import pandas as pd
+import re
 
 from oca_metrics.adapters.base import BaseAdapter
 
@@ -19,9 +21,128 @@ class ParquetAdapter(BaseAdapter):
 
         try:
             self.con.execute(f"CREATE VIEW {self.table_name} AS SELECT * FROM read_parquet('{parquet_path}', union_by_name=True)")
+            self.table_columns = self._get_table_columns()
+            self.yearly_citation_cols = self._extract_yearly_citation_columns(self.table_columns)
         except Exception as e:
             logger.error(f"Failed to load parquet file at {parquet_path}: {e}")
             raise
+
+    def _get_table_columns(self) -> List[str]:
+        return [row[0] for row in self.con.execute(f"DESCRIBE {self.table_name}").fetchall()]
+
+    @staticmethod
+    def _extract_yearly_citation_columns(columns: Sequence[str]) -> List[str]:
+        yearly_cols = [c for c in columns if re.match(r"^citations_\d{4}$", c)]
+        return sorted(yearly_cols, key=lambda c: int(c.split("_")[1]))
+
+    def get_yearly_citation_columns(self) -> List[str]:
+        try:
+            return list(self.yearly_citation_cols)
+        except Exception as e:
+            logger.warning(f"Could not infer yearly citation columns: {e}")
+            return []
+
+    @staticmethod
+    def _parse_merged_languages(payload: Any) -> set:
+        if payload is None or (isinstance(payload, float) and pd.isna(payload)):
+            return set()
+
+        try:
+            data = payload if isinstance(payload, dict) else json.loads(payload)
+        except Exception:
+            return set()
+
+        if not isinstance(data, dict):
+            return set()
+
+        langs = set()
+        for v in data.values():
+            if isinstance(v, dict):
+                lang = v.get("language")
+                if lang:
+                    langs.add(str(lang).strip().lower())
+
+        return langs
+
+    @classmethod
+    def _is_multilingual_scielo_merge_record(cls, is_merged: Any, payload: Any) -> int:
+        if not bool(is_merged):
+            return 0
+
+        return 1 if len(cls._parse_merged_languages(payload)) > 1 else 0
+
+    @staticmethod
+    def _build_top_counts_sql(windows: Sequence[int], thresholds: Dict[str, Any]) -> List[str]:
+        top_counts_sql = []
+        percentiles = set()
+        for key in thresholds.keys():
+            if key.startswith("C_top") and "pct" in key:
+                parts = key.split("top")[1].split("pct")
+                percentiles.add(int(parts[0]))
+
+        for pct_val in sorted(percentiles, reverse=True):
+            t_all = thresholds.get(f"C_top{pct_val}pct", 0)
+            top_counts_sql.append(
+                f"SUM(CASE WHEN citations_total >= {t_all} THEN 1 ELSE 0 END) "
+                f"as top_{pct_val}pct_all_time_publications_count"
+            )
+
+            for w in windows:
+                t_w = thresholds.get(f"C_top{pct_val}pct_window_{w}y", 0)
+                top_counts_sql.append(
+                    f"SUM(CASE WHEN citations_window_{w}y >= {t_w} THEN 1 ELSE 0 END) "
+                    f"as top_{pct_val}pct_window_{w}y_publications_count"
+                )
+
+        return top_counts_sql
+
+    def _build_journal_select_columns(self, windows: Sequence[int], top_counts_sql: Sequence[str]) -> List[str]:
+        select_cols = [
+            "source_id as journal_id",
+            "ANY_VALUE(source_issn_l) as journal_issn",
+            "COUNT(*) as journal_publications_count",
+            "SUM(citations_total) as journal_citations_total",
+            "AVG(citations_total) as journal_citations_mean",
+        ]
+        select_cols.extend([f"SUM(citations_window_{w}y) as citations_window_{w}y" for w in windows])
+        select_cols.extend(
+            [f"SUM(CASE WHEN citations_window_{w}y >= 1 THEN 1 ELSE 0 END) as citations_window_{w}y_works" for w in windows]
+        )
+        select_cols.extend([f"SUM({c}) as {c}" for c in self.yearly_citation_cols])
+        select_cols.extend([f"AVG(citations_window_{w}y) as journal_citations_mean_window_{w}y" for w in windows])
+        select_cols.extend(top_counts_sql)
+        return select_cols
+
+    def _compute_multilingual_flag_by_scielo_merge(self, year: int, level: str, cat_id: str) -> pd.DataFrame:
+        required_cols = {"is_merged", "oa_individual_works"}
+        if not required_cols.issubset(set(self.table_columns)):
+            return pd.DataFrame(columns=["journal_id", "is_journal_multilingual"])
+
+        query = f"""
+        SELECT
+            source_id as journal_id,
+            is_merged,
+            oa_individual_works
+        FROM {self.table_name}
+        WHERE publication_year = {year} AND {level} = '{cat_id}' AND source_id IS NOT NULL
+        """
+        try:
+            df = self.con.execute(query).df()
+        except Exception:
+            return pd.DataFrame(columns=["journal_id", "is_journal_multilingual"])
+
+        if df.empty:
+            return pd.DataFrame(columns=["journal_id", "is_journal_multilingual"])
+
+        df["is_journal_multilingual"] = [
+            self._is_multilingual_scielo_merge_record(is_merged, payload)
+            for is_merged, payload in zip(df["is_merged"], df["oa_individual_works"])
+        ]
+        return (
+            df.groupby("journal_id", as_index=False)["is_journal_multilingual"]
+            .max()
+            .astype({"is_journal_multilingual": "int64"})
+        )
 
     def get_categories(self, year: int, level: str, category_id: Optional[str] = None) -> List[str]:
         cat_filter = f"AND {level} = '{category_id}'" if category_id else ""
@@ -73,39 +194,33 @@ class ParquetAdapter(BaseAdapter):
             return {}
 
     def compute_journal_metrics(self, year: int, level: str, cat_id: str, windows: Sequence[int], thresholds: Dict[str, Any]) -> pd.DataFrame:
-        top_counts_sql = []
-        # Extract percentiles from threshold keys
-        percentiles = set()
-        for key in thresholds.keys():
-            if key.startswith("C_top") and "pct" in key:
-                parts = key.split("top")[1].split("pct")
-                percentiles.add(int(parts[0]))
-
-        for pct_val in sorted(percentiles, reverse=True):
-            t_all = thresholds.get(f"C_top{pct_val}pct", 0)
-            top_counts_sql.append(f"SUM(CASE WHEN citations_total >= {t_all} THEN 1 ELSE 0 END) as top_{pct_val}pct_all_time_publications_count")
-
-            for w in windows:
-                t_w = thresholds.get(f"C_top{pct_val}pct_window_{w}y", 0)
-                top_counts_sql.append(f"SUM(CASE WHEN citations_window_{w}y >= {t_w} THEN 1 ELSE 0 END) as top_{pct_val}pct_window_{w}y_publications_count")
+        top_counts_sql = self._build_top_counts_sql(windows, thresholds)
+        select_cols = self._build_journal_select_columns(windows, top_counts_sql)
 
         query = f"""
         SELECT 
-            source_id as journal_id,
-            ANY_VALUE(source_issn_l) as journal_issn,
-            COUNT(*) as journal_publications_count,
-            SUM(citations_total) as journal_citations_total,
-            AVG(citations_total) as journal_citations_mean,
-            {", ".join([f"SUM(citations_window_{w}y) as citations_window_{w}y" for w in windows])},
-            {", ".join([f"SUM(CASE WHEN citations_window_{w}y >= 1 THEN 1 ELSE 0 END) as citations_window_{w}y_works" for w in windows])},
-            {", ".join([f"AVG(citations_window_{w}y) as journal_citations_mean_window_{w}y" for w in windows])},
-            {", ".join(top_counts_sql)}
+            {", ".join(select_cols)}
         FROM {self.table_name}
         WHERE publication_year = {year} AND {level} = '{cat_id}' AND source_id IS NOT NULL
         GROUP BY source_id
         """
         try:
-            return self.con.execute(query).df()
+            df_journals = self.con.execute(query).df()
+            if df_journals.empty:
+                return df_journals
+
+            df_multilingual = self._compute_multilingual_flag_by_scielo_merge(year, level, cat_id)
+            if df_multilingual.empty:
+                df_journals["is_journal_multilingual"] = 0
+            else:
+                df_journals = df_journals.merge(df_multilingual, on="journal_id", how="left")
+                df_journals["is_journal_multilingual"] = (
+                    pd.to_numeric(df_journals["is_journal_multilingual"], errors="coerce")
+                    .fillna(0)
+                    .astype(int)
+                )
+
+            return df_journals
 
         except Exception as e:
             logger.error(f"Error computing journal metrics for {cat_id} in {year}: {e}")

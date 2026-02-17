@@ -1,6 +1,7 @@
 import unittest
 import pandas as pd
 import duckdb
+import json
 
 from oca_metrics.adapters.parquet import ParquetAdapter
 
@@ -17,11 +18,25 @@ class TestParquetAdapter(unittest.TestCase):
             'publication_year': [2024, 2024, 2024, 2023],
             'source_id': ['S1', 'S2', 'S1', 'S3'],
             'source_issn_l': ['1234-5678', '8765-4321', '1234-5678', '1111-2222'],
+            'language': ['en', 'en', 'pt', 'en'],
+            'is_merged': [1, 0, 0, 0],
+            'oa_individual_works': [
+                json.dumps({
+                    "W1": {"language": "en"},
+                    "W2": {"language": "pt"},
+                    "W3": {"language": "es"},
+                }),
+                None,
+                None,
+                None,
+            ],
             'field': ['Medicine', 'Medicine', 'Medicine', 'Physics'],
             'citations_total': [10, 5, 20, 15],
             'citations_window_2y': [2, 1, 4, 3],
             'citations_window_3y': [3, 2, 5, 4],
-            'citations_window_5y': [5, 3, 8, 6]
+            'citations_window_5y': [5, 3, 8, 6],
+            'citations_2024': [1, 0, 3, 2],
+            'citations_2025': [2, 1, 5, 0],
         }
         df = pd.DataFrame(data)
         df.to_parquet(self.parquet_path)
@@ -37,6 +52,10 @@ class TestParquetAdapter(unittest.TestCase):
         categories = self.adapter.get_categories(2024, 'field')
         self.assertIn('Medicine', categories)
         self.assertNotIn('Physics', categories) # Different year
+
+    def test_get_yearly_citation_columns(self):
+        citation_cols = self.adapter.get_yearly_citation_columns()
+        self.assertEqual(citation_cols, ['citations_2024', 'citations_2025'])
 
     def test_compute_baseline(self):
         baseline = self.adapter.compute_baseline(2024, 'field', 'Medicine', [2, 3])
@@ -80,6 +99,12 @@ class TestParquetAdapter(unittest.TestCase):
         
         # S1 window 2y: 2, 4. Threshold 3. Only 4 >= 3. Count = 1.
         self.assertEqual(s1['top_50pct_window_2y_publications_count'], 1)
+        self.assertEqual(s1['is_journal_multilingual'], 1)
+        self.assertEqual(s1['citations_2024'], 4)  # 1 + 3
+        self.assertEqual(s1['citations_2025'], 7)  # 2 + 5
+
+        s2 = df_journals[df_journals['journal_id'] == 'S2'].iloc[0]
+        self.assertEqual(s2['is_journal_multilingual'], 0)
 
 
 if __name__ == '__main__':

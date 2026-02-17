@@ -9,8 +9,10 @@ from oca_metrics.core import MetricsEngine
 from oca_metrics.utils.metrics import (
     load_global_metadata,
     get_csv_schema_order,
+)
+from oca_metrics.utils.normalization import (
     format_output_header_name,
-    shorten_openalex_id
+    shorten_openalex_id,
 )
 
 
@@ -64,7 +66,8 @@ def main():
     
     df_meta = load_global_metadata(args.global_xlsx) if args.global_xlsx else pd.DataFrame()
 
-    schema_keys = get_csv_schema_order(windows, [99, 95, 90, 50]) 
+    yearly_citation_cols = adapter.get_yearly_citation_columns()
+    schema_keys = get_csv_schema_order(windows, [99, 95, 90, 50], yearly_citation_cols) 
     output_headers = [format_output_header_name(k) for k in schema_keys]
     
     output_file = args.output_file or f"indicators_{level}_{years[0]}-{years[-1]}.csv"
