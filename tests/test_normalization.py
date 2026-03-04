@@ -3,9 +3,10 @@ import unittest
 from oca_metrics.utils.normalization import (
     extract_year,
     format_output_header_name,
+    safe_int,
     shorten_openalex_id,
     stz_binary_flag,
-    stz_openalex_source_id,
+    stz_openalex_journal_id,
     stz_text,
     stz_doi,
     stz_title,
@@ -47,11 +48,17 @@ class TestNormalization(unittest.TestCase):
         self.assertEqual(stz_binary_flag("no"), 0)
         self.assertEqual(stz_binary_flag(None), 0)
 
-    def test_stz_openalex_source_id(self):
-        self.assertEqual(stz_openalex_source_id("S123"), "https://openalex.org/S123")
-        self.assertEqual(stz_openalex_source_id("https://openalex.org/S123"), "https://openalex.org/S123")
-        self.assertEqual(stz_openalex_source_id(""), None)
-        self.assertEqual(stz_openalex_source_id(None), None)
+    def test_safe_int(self):
+        self.assertEqual(safe_int(1), 1)
+        self.assertEqual(safe_int(0), 0)
+        self.assertEqual(safe_int("7"), 7)
+        self.assertEqual(safe_int(None), 0)
+
+    def test_stz_openalex_journal_id(self):
+        self.assertEqual(stz_openalex_journal_id("S123"), "https://openalex.org/S123")
+        self.assertEqual(stz_openalex_journal_id("https://openalex.org/S123"), "https://openalex.org/S123")
+        self.assertEqual(stz_openalex_journal_id(""), None)
+        self.assertEqual(stz_openalex_journal_id(None), None)
 
     def test_format_output_header_name(self):
         self.assertEqual(format_output_header_name("journal_id"), "journal id")

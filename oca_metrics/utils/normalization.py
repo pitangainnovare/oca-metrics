@@ -71,7 +71,14 @@ def stz_binary_flag(value: Any) -> int:
     return 0
 
 
-def stz_openalex_source_id(value: Any, url_prefix: str = OPENALEX_URL_PREFIX) -> Any:
+def safe_int(value: Any) -> int:
+    if pd.notna(value):
+        return int(value)
+
+    return 0
+
+
+def stz_openalex_journal_id(value: Any, url_prefix: str = OPENALEX_URL_PREFIX) -> Any:
     if pd.isna(value):
         return None
 
