@@ -83,19 +83,19 @@ class TestUtilsMetrics(unittest.TestCase):
         try:
             loaded_df = load_global_metadata(filename)
             self.assertFalse(loaded_df.empty)
-            self.assertIn('source_id', loaded_df.columns)
+            self.assertIn('journal_id', loaded_df.columns)
             self.assertIn('journal_title', loaded_df.columns)
-            self.assertIn('country', loaded_df.columns)
+            self.assertIn('journal_country', loaded_df.columns)
             self.assertIn('scielo_collection_acronym', loaded_df.columns)
             self.assertIn('scielo_active_valid', loaded_df.columns)
-            self.assertIn('publisher_name', loaded_df.columns)
+            self.assertIn('journal_publisher', loaded_df.columns)
             self.assertIn('is_scopus', loaded_df.columns)
-            self.assertEqual(loaded_df.iloc[0]['source_id'], "https://openalex.org/S1")
+            self.assertEqual(loaded_df.iloc[0]['journal_id'], "https://openalex.org/S1")
             self.assertEqual(loaded_df.iloc[0]['is_scielo'], 1)
-            self.assertEqual(loaded_df.iloc[0]['country'], "Brazil")
+            self.assertEqual(loaded_df.iloc[0]['journal_country'], "Brazil")
             self.assertEqual(loaded_df.iloc[0]['scielo_collection_acronym'], "scl")
             self.assertEqual(loaded_df.iloc[0]['scielo_active_valid'], 1)
-            self.assertEqual(loaded_df.iloc[0]['publisher_name'], "Pub 1")
+            self.assertEqual(loaded_df.iloc[0]['journal_publisher'], "Pub 1")
             self.assertEqual(loaded_df.iloc[0]['is_scopus'], 1)
             self.assertEqual(loaded_df.iloc[0]['capes_agricultural_sciences'], 1)
         finally:
@@ -123,7 +123,7 @@ class TestUtilsMetrics(unittest.TestCase):
         try:
             loaded_df = load_global_metadata(filename)
             self.assertEqual(len(loaded_df), 1)
-            self.assertEqual(loaded_df.iloc[0]['source_id'], "https://openalex.org/S1")
+            self.assertEqual(loaded_df.iloc[0]['journal_id'], "https://openalex.org/S1")
             self.assertEqual(loaded_df.iloc[0]['publication_year'], 2024)
         finally:
             if os.path.exists(filename):
