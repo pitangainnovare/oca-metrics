@@ -11,8 +11,15 @@ import pandas as pd
 
 
 THRESHOLD_KEY_PATTERN = re.compile(r"^C_top(\d+)pct(?:_window_(\d+)y)?$")
-DEFAULT_IMPACT_MIN_PUBS_ABS = 8
-DEFAULT_IMPACT_MIN_PUBS_MEDIAN_RATIO = 0.5
+DEFAULT_IMPACT_MIN_PUBS_ABS = 12
+DEFAULT_IMPACT_MIN_PUBS_CATEGORY_SHARE = 0.05
+DEFAULT_IMPACT_MIN_PUBS_MEDIAN_MULTIPLIER = 1.0
+DEFAULT_IMPACT_MIN_PUBS_CATEGORY_SHARE_BY_LEVEL = {
+    "domain": 0.0003,
+    "field": 0.001,
+    "subfield": 0.005,
+    "topic": 0.02,
+}
 
 
 def compute_percentiles(citations: List[int], percentiles: List[float]) -> Dict[float, float]:
@@ -36,28 +43,44 @@ def compute_cohort_impact(journal_mean: float, category_mean: float) -> float:
     return journal_mean / category_mean
 
 
+def resolve_impact_min_pubs_category_share(level: str) -> float:
+    """Resolve default category-share threshold for comparability by taxonomy level."""
+    return DEFAULT_IMPACT_MIN_PUBS_CATEGORY_SHARE_BY_LEVEL.get(level, DEFAULT_IMPACT_MIN_PUBS_CATEGORY_SHARE)
+
+
 def compute_impact_comparability_reference(
+    category_publications_count: float,
     publication_counts: pd.Series,
     min_publications_abs: int = DEFAULT_IMPACT_MIN_PUBS_ABS,
-    median_ratio: float = DEFAULT_IMPACT_MIN_PUBS_MEDIAN_RATIO,
+    category_share: float = DEFAULT_IMPACT_MIN_PUBS_CATEGORY_SHARE,
+    median_multiplier: float = DEFAULT_IMPACT_MIN_PUBS_MEDIAN_MULTIPLIER,
 ) -> Dict[str, float]:
     """
     Compute cohort-level comparability reference values for impact metrics.
 
     Rule:
-      min_required = max(min_publications_abs, ceil(median(publication_counts) * median_ratio))
+      min_required = max(
+          min_publications_abs,
+          ceil(category_publications_count * category_share),
+          ceil(median(publication_counts) * median_multiplier),
+      )
     """
+    category_docs = pd.to_numeric(pd.Series([category_publications_count]), errors="coerce").fillna(0).iloc[0]
+    category_docs = max(0, int(category_docs))
     counts = pd.to_numeric(publication_counts, errors="coerce").dropna()
     cohort_median = float(counts.median()) if not counts.empty else 0.0
-
     safe_abs = max(1, int(min_publications_abs))
-    safe_ratio = max(0.0, float(median_ratio))
-    ratio_required = int(np.ceil(cohort_median * safe_ratio))
-    min_required = max(safe_abs, ratio_required)
+    safe_share = max(0.0, float(category_share))
+    safe_median_multiplier = max(0.0, float(median_multiplier))
+    share_required = int(np.ceil(category_docs * safe_share))
+    median_required = int(np.ceil(cohort_median * safe_median_multiplier))
+    min_required = max(safe_abs, share_required, median_required)
 
     return {
-        "cohort_journal_publications_median": cohort_median,
         "cohort_impact_min_pubs_required": min_required,
+        "cohort_journal_publications_median": cohort_median,
+        "cohort_impact_min_pubs_category_share": safe_share,
+        "cohort_impact_min_pubs_median_multiplier": safe_median_multiplier,
     }
 
 
