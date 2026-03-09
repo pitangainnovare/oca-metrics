@@ -208,7 +208,6 @@ El archivo CSV resultante contiene los indicadores bibliométricos computados, o
 | | `journal_citations_mean_window_{w}y` | Promedio de citas en la ventana de {w} años. |
 | | `journal_impact_cohort_window_{w}y` | Impacto de cohorte en la ventana de {w} años. |
 | **Métricas Percentil** | `top_{pct}pct_all_time_citations_threshold` | Umbral de citas para el top {pct}% (todo el tiempo). |
-| **Métricas Percentil** | `top_{pct}pct_all_time_citations_threshold` | Umbral de citas para el top {pct}% (todo el tiempo). |
 | | `top_{pct}pct_all_time_publications_count` | Número de publicaciones en el top {pct}% (todo el tiempo). |
 | | `top_{pct}pct_all_time_publications_share_pct` | Porcentaje de publicaciones en el top {pct}% (todo el tiempo). |
 | | `top_{pct}pct_window_{w}y_citations_threshold` | Umbral de citas para el top {pct}% en ventana de {w} años. |

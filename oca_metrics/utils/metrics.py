@@ -38,7 +38,7 @@ def compute_category_publication_stats(
     publication_counts: pd.Series,
 ) -> Dict[str, float]:
     """
-    Compute category-level publication statistics (total, mean, median).
+    Compute category-level publication statistics (mean, median).
     """
     counts = pd.to_numeric(publication_counts, errors="coerce").dropna()
     

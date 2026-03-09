@@ -9,9 +9,6 @@ from oca_metrics.core import MetricsEngine
 from oca_metrics.utils.csv_schema import (
     get_csv_schema_order,
 )
-from oca_metrics.utils.metrics import (
-    build_threshold_key,
-)
 from oca_metrics.utils.metadata import (
     load_global_metadata,
 )
