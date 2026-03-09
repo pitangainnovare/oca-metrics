@@ -27,7 +27,11 @@ def get_csv_schema_order(
     cols += [f"category_citations_mean_window_{w}y" for w in windows]
     cols += ["category_citations_total"]
     cols += [f"category_citations_total_window_{w}y" for w in windows]
-    cols += ["category_publications_count"]
+    cols += [
+        "category_publications_count",
+        "category_publications_mean",
+        "category_publications_median",
+    ]
     cols += [f"citations_window_{w}y" for w in windows]
     cols += [f"citations_window_{w}y_works" for w in windows]
     cols += list(yearly_citation_cols)
@@ -35,14 +39,6 @@ def get_csv_schema_order(
     cols += [f"journal_citations_mean_window_{w}y" for w in windows]
     cols += ["journal_citations_total", "journal_impact_cohort"]
     cols += [f"journal_impact_cohort_window_{w}y" for w in windows]
-    cols += [
-        "cohort_impact_min_pubs_required",
-        "cohort_journal_publications_median",
-        "cohort_impact_min_pubs_category_share",
-        "cohort_impact_min_pubs_median_multiplier",
-        "cohort_impact_is_comparable",
-    ]
-    cols += [f"cohort_impact_window_{w}y_is_comparable" for w in windows]
     cols += ["journal_publications_count", "is_journal_multilingual"]
 
     for p in target_percentiles:

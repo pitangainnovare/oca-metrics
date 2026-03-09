@@ -193,11 +193,13 @@ The resulting CSV file contains the computed bibliometric indicators, organized 
 | | `scielo_active_valid` | Journal status in SciELO. |
 | | `is_scielo` | Binary indicator (0/1) if the journal is in SciELO. |
 | **Category Metrics** | `category_publications_count` | Total publications in the category for the year. |
+| | `category_publications_mean` | Mean journal publication count in the category for the year. |
+| | `category_publications_median` | Median journal publication count in the category for the year. |
 | | `category_citations_total` | Total citations received by the category. |
 | | `category_citations_mean` | Mean citations per publication in the category. |
 | | `category_citations_total_window_{w}y` | Total citations in the {w}-year window. |
 | | `category_citations_mean_window_{w}y` | Mean citations in the {w}-year window. |
-| **Journal Metrics** | `journal_publications_count` | Total publications of the journal in the year. |
+| **Journal Metrics** | `journal_publications_count` | Total publications of the journal in the year, in this category. |
 | | `journal_citations_total` | Total citations received by the journal. |
 | | `journal_citations_mean` | Mean citations per journal publication. |
 | | `journal_impact_cohort` | Cohort impact (Journal Mean / Category Mean). |
@@ -205,12 +207,6 @@ The resulting CSV file contains the computed bibliometric indicators, organized 
 | | `citations_window_{w}y_works` | Number of works with at least 1 citation in the window. |
 | | `journal_citations_mean_window_{w}y` | Mean citations in the {w}-year window. |
 | | `journal_impact_cohort_window_{w}y` | Cohort impact in the {w}-year window. |
-| | `cohort_impact_min_pubs_required` | Minimum publications required for impact comparability in the cohort. |
-| | `cohort_journal_publications_median` | Median journal publication count in the cohort (category + year). |
-| | `cohort_impact_min_pubs_category_share` | Category/year publication share used to compute the comparability threshold. |
-| | `cohort_impact_min_pubs_median_multiplier` | Multiplier over cohort median used in the comparability threshold. |
-| | `cohort_impact_is_comparable` | Indicator (0/1) if the journal impact is comparable in the cohort. |
-| | `cohort_impact_window_{w}y_is_comparable` | Indicator (0/1) if windowed cohort impact is comparable. |
 | **Percentile Metrics** | `top_{pct}pct_all_time_citations_threshold` | Citation threshold for top {pct}% (all time). |
 | | `top_{pct}pct_all_time_publications_count` | Number of publications in top {pct}% (all time). |
 | | `top_{pct}pct_all_time_publications_share_pct` | Share (%) of publications in top {pct}% (all time). |

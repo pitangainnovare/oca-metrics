@@ -73,14 +73,8 @@ class TestMetricsEngine(unittest.TestCase):
         # Check cohort impact
         self.assertEqual(df_result.iloc[0]['journal_impact_cohort'], 10.0 / 5.0) # 2.0
         self.assertEqual(df_result.iloc[1]['journal_impact_cohort'], 2.5 / 5.0) # 0.5
-        self.assertEqual(df_result.iloc[0]['cohort_impact_min_pubs_required'], 15)
-        self.assertEqual(df_result.iloc[0]['cohort_journal_publications_median'], 15.0)
-        self.assertEqual(df_result.iloc[0]['cohort_impact_min_pubs_category_share'], 0.001)
-        self.assertEqual(df_result.iloc[0]['cohort_impact_min_pubs_median_multiplier'], 1.0)
-        self.assertEqual(df_result.iloc[0]['cohort_impact_is_comparable'], 0)
-        self.assertEqual(df_result.iloc[1]['cohort_impact_is_comparable'], 1)
-        self.assertEqual(df_result.iloc[0]['cohort_impact_window_2y_is_comparable'], 0)
-        self.assertEqual(df_result.iloc[0]['cohort_impact_window_3y_is_comparable'], 0)
+        self.assertEqual(df_result.iloc[0]['category_publications_median'], 15.0)
+        self.assertEqual(df_result.iloc[0]['category_publications_mean'], 15.0)
 
         # Check percentile shares
         # J1 top 1% share: 2/10 = 20%
@@ -155,7 +149,6 @@ class TestMetricsEngine(unittest.TestCase):
         self.assertEqual(row1['journal_country'], 'Brazil')
         self.assertEqual(row1['scielo_collection'], 'scl')
         self.assertEqual(row1['is_journal_oa'], 1)
-        self.assertEqual(row1['cohort_impact_is_comparable'], 0)
         
         row2 = df_result[df_result['journal_id'] == 'https://openalex.org/S2'].iloc[0]
         self.assertEqual(row2['journal_title'], 'https://openalex.org/S2')
@@ -163,7 +156,6 @@ class TestMetricsEngine(unittest.TestCase):
         self.assertEqual(row2['journal_country'], '')
         self.assertEqual(row2['scielo_collection'], '')
         self.assertEqual(row2['is_journal_oa'], 0)
-        self.assertEqual(row2['cohort_impact_is_comparable'], 1)
 
     def test_process_category_no_baseline(self):
         self.mock_adapter.compute_baseline.return_value = None
