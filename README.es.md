@@ -193,11 +193,13 @@ El archivo CSV resultante contiene los indicadores bibliométricos computados, o
 | | `scielo_active_valid` | Estado de la revista en SciELO. |
 | | `is_scielo` | Indicador binario (0/1) si la revista está en SciELO. |
 | **Métricas Categoría** | `category_publications_count` | Total de publicaciones en la categoría en el año. |
+| | `category_publications_mean` | Promedio de publicaciones por revista en la categoría en el año. |
+| | `category_publications_median` | Mediana de publicaciones por revista en la categoría en el año. |
 | | `category_citations_total` | Total de citas recibidas por la categoría. |
 | | `category_citations_mean` | Promedio de citas por publicación en la categoría. |
 | | `category_citations_total_window_{w}y` | Total de citas en la ventana de {w} años. |
 | | `category_citations_mean_window_{w}y` | Promedio de citas en la ventana de {w} años. |
-| **Métricas Revista** | `journal_publications_count` | Total de publicaciones de la revista en el año. |
+| **Métricas Revista** | `journal_publications_count` | Total de publicaciones de la revista en el año, en esta categoría. |
 | | `journal_citations_total` | Total de citas recibidas por la revista. |
 | | `journal_citations_mean` | Promedio de citas por publicación de la revista. |
 | | `journal_impact_cohort` | Impacto de cohorte (Promedio Revista / Promedio Categoría). |
@@ -205,12 +207,7 @@ El archivo CSV resultante contiene los indicadores bibliométricos computados, o
 | | `citations_window_{w}y_works` | Número de trabajos con al menos 1 cita en la ventana. |
 | | `journal_citations_mean_window_{w}y` | Promedio de citas en la ventana de {w} años. |
 | | `journal_impact_cohort_window_{w}y` | Impacto de cohorte en la ventana de {w} años. |
-| | `cohort_impact_min_pubs_required` | Mínimo de publicaciones requerido para comparabilidad del impacto en la cohorte. |
-| | `cohort_journal_publications_median` | Mediana de publicaciones de las revistas en la cohorte (categoría + año). |
-| | `cohort_impact_min_pubs_category_share` | Proporción de publicaciones de categoría/año usada para calcular el umbral de comparabilidad. |
-| | `cohort_impact_min_pubs_median_multiplier` | Multiplicador sobre la mediana de la cohorte usado en el umbral de comparabilidad. |
-| | `cohort_impact_is_comparable` | Indicador (0/1) de si el impacto de la revista es comparable en la cohorte. |
-| | `cohort_impact_window_{w}y_is_comparable` | Indicador (0/1) de si el impacto de cohorte en ventana es comparable. |
+| **Métricas Percentil** | `top_{pct}pct_all_time_citations_threshold` | Umbral de citas para el top {pct}% (todo el tiempo). |
 | **Métricas Percentil** | `top_{pct}pct_all_time_citations_threshold` | Umbral de citas para el top {pct}% (todo el tiempo). |
 | | `top_{pct}pct_all_time_publications_count` | Número de publicaciones en el top {pct}% (todo el tiempo). |
 | | `top_{pct}pct_all_time_publications_share_pct` | Porcentaje de publicaciones en el top {pct}% (todo el tiempo). |
